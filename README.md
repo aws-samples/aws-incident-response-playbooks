@@ -17,6 +17,10 @@ It is not sufficient to customize these scenarios to the need of your customers,
 
 Note that some of the incident response steps noted in each scenario may incur costs in your AWS account(s) for services used in either preparing for, or responding to incidents. Customizing these scenarios and testing them will help you to determine if additional costs will be incurred. You can use AWS Cost Explorer and look at costs incurred over a particular time frame (such as when running Game Days) to establish what the possible impact might be.
 
+## Usage
+
+The runbooks are written in markdown to facilitate editing and consumption into a variety of user systems.
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
