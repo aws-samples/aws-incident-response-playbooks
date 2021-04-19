@@ -40,7 +40,7 @@ Note that some of the incident response steps noted in each scenario may incur c
     2. Open a conference bridge war room for the incident
     3. Notify identified stakeholders including (if required) legal personnel, technical teams and developers and add them to the ticket and the war room, so they are updated as the ticket is updated
 
-### Part 2: Contain The Incident
+### Part 2: Contain the Incident
 
 The immediate task will be to disable compromised credentials or revoke permissions associated with those credentials, thereby preventing any further API activity using the compromised credentials.
 
