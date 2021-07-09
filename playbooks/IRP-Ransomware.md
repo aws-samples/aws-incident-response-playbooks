@@ -16,7 +16,7 @@ You are responsible for making your own independent assessment of the informatio
 
 ### This Playbook
 
-This playbook outlines response steps for Credential Leakage/Compromise incidents.  These steps are based on the [NIST Computer Security Incident Handling Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r2.pdf) (Special Publication 800-61 Revision 2) that can be used to:
+This playbook outlines response steps for handling ransomware incidents.  These steps are based on the [NIST Computer Security Incident Handling Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r2.pdf) (Special Publication 800-61 Revision 2) that can be used to:
 
 •	Gather evidence
 •	Contain and then eradicate the incident
