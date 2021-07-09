@@ -35,7 +35,7 @@ By default, all S3 buckets are private and can be accessed only by users that ar
 
 ## Incident Response Process
 ---
-### Part 1: Acquire, Preserve, Document evidence
+### Part 1: Acquire, Preserve, Document Evidence
 
 1. You become aware that there has been a possible unintended data access to an Amazon S3 bucket. This information could come via different means, for example:
     - An internal ticketing system (the sources of the ticket are varied and could include any of the means below)
@@ -158,7 +158,7 @@ Most of the steps in this section are taken from the [security best practices fo
     5. Encrypt data at rest using [Amazon S3 Server Side Encryption](https://docs.aws.amazon.com/AmazonS3/latest/dev/serv-side-encryption.html) - this protects the data at rest, and means that principals must have permissions in **both **S3 and AWS Key Management Service (AWS KMS) (the AWS KMS Customer Master Key (CMK) key policy) to access the data
     6. [Enable versioning](https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html) in S3 to enable data recovery, and consider:
     7. [Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lock.html) to prevent the deletion of critical data
-    
+
 3. If credential compromise was involved:
     1. Flag for review the process for handling user credentials during Move/Add/Change (MAC) procedures for the post-incident activity
     2. The compromised credentials should have been disabled in Part 2, you may now consider issuing new credentials to impacted users

@@ -37,7 +37,7 @@ DoS and DDoS attacks are “denial of service” attacks, designed to prevent le
 
 ## Incident Response Process
 ---
-### Part 1: Acquire, Preserve, document evidence
+### Part 1: Acquire, Preserve, Document Evidence
 
 1.	You become aware that there has been a possible unintended data access to an Amazon S3 bucket. This information could come via different means, for example:
   - An internal ticketing system (the sources of the ticket are varied and could include any of the means below)

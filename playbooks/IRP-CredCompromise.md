@@ -36,7 +36,7 @@ Credential compromise occurs when credentials related to one or more of your IAM
 
 ## Incident Response Process
 ---
-### Part 1: Acquire, Preserve, Document evidence
+### Part 1: Acquire, Preserve, Document Evidence
 
 1. You become aware of potential indicators of compromise (IoCs). These could come in various forms:
     - An internal ticketing system (the sources of the ticket are varied and could include any of the means below)
@@ -65,7 +65,7 @@ Credential compromise occurs when credentials related to one or more of your IAM
     3. If there are regulations in your jurisdiction requiring reporting of such incidents, ensure the people in your organization responsible for notifying local or federal law enforcement agencies are also notified of the event/added to the ticket. Consult your legal advisor and/or law enforcement for guidance on collecting and preserving the evidence and chain of custody.
     4. There may not be regulations, but either open databases, government agencies or NGOs may track this type of activity. Your reporting may assist others
 
-### Part 2: Contain The Incident
+### Part 2: Contain the Incident
 
 The immediate task will be to disable compromised credentials or revoke permissions associated with those credentials, thereby preventing any further API activity using the compromised credentials.
 

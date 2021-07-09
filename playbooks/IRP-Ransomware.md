@@ -40,7 +40,7 @@ Ransomware is malicious code designed by threat actors to gain unauthorized acce
 There are usually limited options to mitigate a successful ransomware attack once it has occurred.  The best mitigation is to reduce the chance that it can happen in the first place. The AWS Well-Architected security pillar provides a framework to implement AWS best practice, including operating workloads security (security foundations section), protecting compute resources (infrastructure protection section) and others. The security pillar encompasses the ability to protect data, systems, and assets to take advantage of cloud technologies to improve your security. This playbook covers steps that can be used to deal with ransomware.
 ## Incident Response Process
 ---
-### Part 1: Acquire, Preserve, Document evidence
+### Part 1: Acquire, Preserve, Document Evidence
 
 1.  You become aware that a possible ransomware incident has occurred. This information could come via different means, depending on your configurations in your AWS environment:
 1.	A colleague reports that an EC2 instance cannot be accessed by SSH or similar, however the instance appears to be correctly configured with appropriate network access in place, and there are no related service issues reported by AWS in the Service Health Dashboard
