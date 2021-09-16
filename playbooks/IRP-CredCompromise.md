@@ -142,6 +142,6 @@ Firstly, perform any required forensic investigation to determine (for compromis
 
 Secondly, review the incident itself and the response to it, to determine if anything needs to be changed for handling any similar incidents in the future.
 
-1. Review the incident handling and the incident handling process with key stakeholders identified in Part 1, Step 6.
+1. Review the incident handling and the incident handling process with key stakeholders identified in Part 1, Step 8.
 2. Document lessons learned, including attack vector(s) mitigation(s), misconfiguration, etc.
 3. Store the artifacts from this process with the application information in the CMDB entry for the application and also in the CMDB entry for the credential compromise response process.
