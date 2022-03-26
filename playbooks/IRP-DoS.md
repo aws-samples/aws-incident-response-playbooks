@@ -22,7 +22,7 @@ This playbook outlines response steps for Web Application Dos/DDoS Attack incide
 * recover from the incident
 * Conduct post-incident activities, including post-mortem and feedback processes
 
-Interested readers may also refer to the [AWS Security Incident Response Guide]( https://d1.awsstatic.com/whitepapers/aws_security_incident_response.pdf) (first published in June 2019)   which contains additional resources.
+Interested readers may also refer to the [AWS Security Incident Response Guide]( https://docs.aws.amazon.com/whitepapers/latest/aws-security-incident-response-guide/welcome.html) which contains additional resources.
 
 Once you have customized this playbook to meet your needs, it is important that you test the playbook (e.g., Game Days) and any automation (functional tests), update as necessary to achieve the desired results, and then publish to your knowledge management system and train all responders.
 
