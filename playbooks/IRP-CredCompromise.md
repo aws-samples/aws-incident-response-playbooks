@@ -22,7 +22,7 @@ This playbook outlines response steps for Credential Leakage/Compromise incident
 * Recover from the incident
 * Conduct post-incident activities, including post-mortem and feedback processes
 
-Interested readers may also refer to the [AWS Security Incident Response Guide]( https://d1.awsstatic.com/whitepapers/aws_security_incident_response.pdf) (first published in June 2019) which contains additional resources.
+Interested readers may also refer to the [AWS Security Incident Response Guide]( https://docs.aws.amazon.com/whitepapers/latest/aws-security-incident-response-guide/welcome.html) which contains additional resources.
 
 Once you have customized this playbook to meet your needs, it is important that you test the playbook (e.g., Game Days) and any automation (functional tests), update as necessary to achieve the desired results, and then publish to your knowledge management system and train all responders.
 
@@ -42,7 +42,7 @@ Credential compromise occurs when credentials related to one or more of your IAM
     - An internal ticketing system (the sources of the ticket are varied and could include any of the means below)
     -	A message from a contractor or third-party service provider
     -	From an alert in one of your monitoring systems either inside or external to AWS (for example, in AWS, in this particular situation, it could be via an Amazon GuardDuty finding, either directly in GuardDuty, or via AWS Security Hub, or it could be via a [CloudWatch metric indicating a change in IAM]( https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html#cloudwatch-alarms-for-cloudtrail-iam-policy-changes) or from your own systems ingesting AWS data)
-    - Alarms or observations that resources have been created in your account that cannot be accounted for in your CMDB, exist in regions that you do not operate infrastructure in, or themselves have generated alerts ([[Amazon Detective]( https://aws.amazon.com/detective/getting-started/) is a useful tool for understanding these relationships
+    - Alarms or observations that resources have been created in your account that cannot be accounted for in your CMDB, exist in regions that you do not operate infrastructure in, or themselves have generated alerts ([[Amazon Detective]( https://aws.amazon.com/detective/getting-started/) is a useful tool for understanding these relationships)
     - Via an anonymous tip
     - Via independent or external security researchers
     - Where credentials have been compromised, you are less likely to be contacted via the threat actor, as in this situation typically they want to maximize their use of resources and minimize the chance of being discovered, unless the compromise is being used to exfiltrate data or cause some other kind of public incident such as through the modification of your publicly facing resources
