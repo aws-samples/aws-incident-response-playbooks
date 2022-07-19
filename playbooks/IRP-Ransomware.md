@@ -47,7 +47,7 @@ There are usually limited options to mitigate a successful ransomware attack onc
 2.	Your ticketing system creates a ticket for unusual metrics or logs from the EC2 instance
 3.	The instance is reporting network reachability issues in the AWS console, or via Amazon CloudWatch alarms
 4.	Message from threat actor through alternate communication channel such as email about the ransom demand
-5.	Findings through services like AWS Security Hub or Amazon GuardDuty
+5.	Findings through services like AWS Security Hub or Amazon GuardDuty.
 6.	Other alarms or metrics you have configured in your monitoring systems, either internal or external to AWS
 
 2. Once you confirm that an event is a security incident, it is important to determine the scope of impact (quantity of resources as well as sensitivity of data).
