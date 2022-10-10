@@ -39,10 +39,11 @@ DoS and DDoS attacks are “denial of service” attacks, designed to prevent le
 ---
 ### Part 1: Acquire, Preserve, Document Evidence
 
-1.	You become aware that there has been a possible unintended data access to an Amazon S3 bucket. This information could come via different means, for example:
+1.	You become aware that your application is not meeting availability requirements. This may mean that the application is unavailable, is providing a degraded service, or even appears to be functioning, but application performance metrics or logging are suggesting that there may be an issue. This information could come via different means, for example:
+  - Customer contact/feedback/support calls
   - An internal ticketing system (the sources of the ticket are varied and could include any of the means below)
   - A message from a contractor or third-party service provider
-  - From an alert in one of your own monitoring systems either internal or external to AWS (for example, in AWS, in this particular situation, it could be via CloudWatch metrics triggering an alarm from Amazon EC2, AWS Application Load Balancer, Amazon CloudFront, AWS WAF or other services that you have configured CloudWatch alarms for
+  - From an alert in one of your own monitoring systems either internal or external to AWS (for example, in AWS, in this particular situation, it could be via CloudWatch metrics triggering an alarm from Amazon EC2, AWS Application Load Balancer, Amazon CloudFront, AWS WAF or other services that you have configured CloudWatch alarms for)
   - Via an anonymous tip
   - Via independent or external security researchers
 2. Confirm an internal ticket/case has been raised for the incident within your organization. If not, manually raise one.
