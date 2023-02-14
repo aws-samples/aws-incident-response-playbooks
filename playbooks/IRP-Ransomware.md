@@ -72,8 +72,8 @@ b.	Open an Incident Response bridge to have a regular communication channel abou
 c.	Notify identified stakeholders including (if required) legal personnel, technical teams and developers and add them to the ticket and the war room, so they are updated as the ticket is updated
 14.	External Communications:
 i.	Ensure your organization’s legal counsel is informed and is included in status updates to internal stakeholders and especially in regards to external communications.
-ii.	For colleagues in the organization that are responsible for providing public/external communication statements, ensure these internal stakeholders are added to the ticket so they receive regular status updates regarding the incident and can complete their own requirements for communications within and external to the business
-iii.	If there are regulations in your jurisdiction requiring reporting of such incidents, ensure the people in your organization responsible for notifying local or federal law enforcement agencies are also notified of the event. Consult your legal advisor and/or law enforcement for guidance on collecting and preserving the evidence and the chain of custody
+ii.	For colleagues in the organization that are responsible for providing public/external communication statements, ensure these internal stakeholders are added to the ticket so they receive regular status updates regarding the incident and can complete their own requirements for communications within and external to the business.
+iii.	If there are regulations in your jurisdiction requiring reporting of such incidents, ensure the people in your organization responsible for notifying local or federal law enforcement agencies are also notified of the event. Consult your legal advisor and/or law enforcement for guidance on collecting and preserving the evidence and the chain of custody.
 iv.	There may not be regulations, but either open databases, government agencies or NGOs may track this type of activity. Your reporting may assist others
 
 ### Part 2: Contain the Incident
