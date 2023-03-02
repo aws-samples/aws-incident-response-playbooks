@@ -71,7 +71,9 @@ All information that can identify an individual is personal data, directly or in
     7. From a security researcher
     8. Via an anonymous tip
     9. From a public news article in the press, on a blog, or in the news
+
 2. Confirm a ticket/case has been raised for the incident. If not, manually raise one.
+
 3. Determine the sensitivity of the impacted data and record specific AWS resources that were the origin of the breach. It is also essential to determine the number of individuals who were affected by the incident with certainty (*Contextual information is often a key factors in determining the severity of an incident within an Organization*):
     1. *Nature of personal data:* Your organization's [data classification](https://docs.aws.amazon.com/whitepapers/latest/data-classification/data-classification.html) standards should also define how to handle a Personal Identifiable Information (PII) data breach. The steps or actions you take may vary depending on the sensitivity/classification of the data involved in the breach, you will refer to your data classification and handling policies to determine this. These standards determine the necessary level of protection for different types of information based on their sensitivity. For example, the level of seriousness for a data breach involving sensitive personal health information of an individual would be greater than that of a breach involving publicly available data:
         1. According to your jurisdiction legal requirements and data classification specifications, it may be necessary to categorize breached data as Personally Identifiable Information (PII) and Publicly Available Information (PAI). Here are few examples:
@@ -84,6 +86,7 @@ All information that can identify an individual is personal data, directly or in
             -  The bucket was made publicly accessible when it should not have been.
             -  The bucket may not have been publicly accessible, but data was still exfiltrated due to credential leakage or an incorrectly configured system that accessed the data and made it publicly available.
     3.  *Number of individual affected:* This information may help your organization to assess the impact on affected individuals and take appropriate measures to mitigate the consequences, such as offering identity theft protection services or providing timely notifications to prevent further harm.
+
 4. The collection of evidence (AWS CloudTrail logs, AWS Config rules finding etc.) in relation to AWS data services must adhere to a strict chain of custody to ensure the integrity and authenticity of the data as per your jurisdiction legal requirements. Evidence and artifacts can consist of, but aren’t limited to:
     1. All EC2 instance metadata
     2. Amazon EBS disk snapshots
@@ -101,11 +104,14 @@ All information that can identify an individual is personal data, directly or in
     14. System logs
     15. Security logs
     16. Any third-party logs
+
 5. At this point, you may not know the cause of data breach:
     1. Extrusion by attackers —an attackers penetrated the security perimeter and,gain access to sensitive personal data.
     2. Insider threats — a malicious insider, or an attacker who has compromised a privileged user accounts, abuses their permissions and attempts to move data outside the organization.
     3. Unintentional or negligent data exposure — an employees who lose sensitive data in public, provide open Internet access to data, or fail to restrict access per organizational policies.
+
 6. If you are already aware of AWS resources involved (like Amazon S3 or Amazon RDS etc) and , Firstly move to **Part 2** to contain the incident. Once that is done, return here and then move on to step 5. If you have not established which bucket(s) are involved, continue to step 4.
+
 7. If you are *not aware* of the AWS resources involved incident personal data breach within an AWS account, follow these steps:
     1. Check AWS services used for data storage and processing, such as Amazon S3, Amazon RDS, Amazon DynamoDB, etc.
     2. Employ the use of internal tools to associate the data with a specific storage location, such as by checking a Configuration Management Database (CMDB).
@@ -118,11 +124,13 @@ All information that can identify an individual is personal data, directly or in
         2. [Identifying access to S3 objects by using CloudTrail](https://docs.aws.amazon.com/AmazonS3/latest/userguide/cloudtrail-request-identification.html#cloudtrail-identification-object-access)
     7. Utilize the *Advanced Queries* feature of AWS Config to analyze any unintentional or unidentified changes to AWS resources and configurations. To get you started, few example queries mentioned [here.](https://docs.aws.amazon.com/config/latest/developerguide/example-query.html)
     8. Examine Amazon VPC Flow Logs and AWS WAF logs for any anomalous network activity.
+
 8. If you are *aware* of the AWS resources involved:
     1. Consider the following steps to identify suspicious activity or unauthorized access in Amazon S3:
         1. [Review Amazon Macie policy findings related to your S3 data](https://docs.aws.amazon.com/macie/latest/user/findings-types.html#findings-policy-types)
         2. [Analyze S3 protection in Amazon GuardDuty](https://docs.aws.amazon.com/guardduty/latest/ug/s3-protection.html) 
     2. For unintended access to an Amazon S3 bucket refer to [this incident response playbook.](https://github.com/aws-samples/aws-incident-response-playbooks/blob/master/playbooks/IRP-DataAccess.md)
+
 9. As previously stated, you maintaining a clear chain of custody is crucial in ensuring the immutability of all evidence. Some of the techniques are mentioned in blog post - [Forensic investigation environment strategies in the AWS Cloud](https://aws.amazon.com/blogs/security/forensic-investigation-environment-strategies-in-the-aws-cloud/). In summary, here are the techniques:
     1. Snapshots of Amazon EBS disks: The original EBS disks can be snapshotted, shared to a forensics account, converted into a volume, and mounted in read-only mode for offline analysis.
     2. Manually captured Amazon EBS volumes: Linux tools such as dc3dd can be used to stream the volume to an S3 bucket, along with a hash, and made immutable using an S3 method.
@@ -131,11 +139,13 @@ All information that can identify an individual is personal data, directly or in
     5. CloudTrail logs: Log file integrity can be validated using CloudTrail's SHA-256 hash and SHA-256 with RSA signing. S3 Object Lock - Governance Mode can be used for protection.
     6. AWS Systems Manager inventory: By default, metadata on managed instances is stored in an S3 bucket and can be secured using the above methods.
     7. AWS Config data: Data stored by AWS Config in an S3 bucket can also be protected through the aforementioned methods.
+
 10. Check if there are any open support tickets for the data storage service, and search for connections with any alerts or information related to the incident. Note any perceived effects on end-users, which may encompass but are not limited to:
     1. Missing data from the storage service
     2. Unexpected presence of new data in the storage service
     3. Changes in access settings (such as permissions) of data, especially if they have been made public
     4. Modified data storage service permissions, access controls, or settings that prevent public access (these may be less noticeable to regular users, but still a possibility)
+
 11. The following are recommendations for internal and external communication regarding a data breach incident, however they may vary based on legal requirements. This example is based on an organization governed by GDPR regulations.
     1. For internal communication, it is important to quickly gather relevant information and assess the scope and impact of the breach. This information should then be shared with the incident response team and relevant stakeholders within the organization. Regular updates should be provided throughout the investigation process to keep everyone informed.
     2. For external communication, it is important to consider the privacy rights of individuals whose PII may have been compromised, as well as the organization's obligations under the GDPR or other relevant legislation/protocols for your jurisdiction. In general, organizations are required to report data breaches to relevant authorities within 72 hours and to notify affected individuals without undue delay. 
@@ -151,6 +161,7 @@ Early identification of unusual actions taken by users or strange network activi
         1. In order to revoke S3 access from an IAM role or user, you need to navigate to the specific S3 bucket where the data breach has occurred. This is where the sensitive data was stored and where unauthorized access occurred.
         2. Once you have navigated to the specific S3 bucket, you need to click on the "Permissions" tab. From there, select the "Bucket Policy" option.
         3. The next step is to remove the access granting policy for the specific IAM role or user.  Here is a example policy on how to [Managing user access to specific folders.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/example-bucket-policies.html#example-bucket-policies-folders)This will effectively revoke the access of the IAM role or user to the S3 bucket, preventing further unauthorized access to the sensitive data
+
 2. In this scenario, external vendor accounts have been accessing PII stored in DynamoDB tables through SQS and AWS Lambda. The PII data is encrypted using a KMS key at rest and in transit by application, however, due to a defect in the application, some of the PII information may not have been encrypted properly in transit. To contain this PII data breach, you can take the following actions: 
     1. Please evaluate the potential business impact of limiting or revoking vendor access to the DynamoDB table, if applicable.
     2. If it is acceptable to revoke the access of the vendor, you can do so by updating the access policy to remove their permissions to access the impacted DynamoDB tables and the corresponding SQS queue. This will help to prevent any unauthorized access or use of the resources, which will limit the potential impact of the security breach.
@@ -166,15 +177,19 @@ First step is to determine the affected resources using log data, resources, and
 1. Identify the potential immediate cause or causes for the PII exposure at hand:
     1. Analyze the collected log data, resources, and tooling to determine the source of the exposure.
     2. Identify if the cause, and then work back through the “5 whys” to get to the root cause https://aws.amazon.com/blogs/mt/why-you-should-develop-a-correction-of-error-coe/.
+
 2. It may be helpful to review the infrastructure deployment pipelines, such as those implemented with CloudFormation via AWS Code Pipeline or Terraform, and the data pipelines to determine which mechanism led to the misconfiguration or misclassification of data injection mechanisms. Are there enough checks and balances in the pipeline? If not, it may be necessary to address this issue.
+
 3. If there are any specific issues that have been identified, take steps to remove any resources or configurations that were identified as the immediate causes. For example:
     1. If the cause is a misconfigured security group, adjust the security group rules to prevent unauthorized access.
     2. If the cause is an unauthorized user, revoke their access to the affected resources.
     3. If the cause is a vulnerability, apply patches or upgrades to fix it.
     4. There may be other causes, take the appropriate action. 
+
 4. Clean up the environment:
     1. Delete any PII data that may have been exposed.
     2. If PII data must be kept, encrypt it to prevent unauthorized access.
+
 5. Restore normal operations:
     1. Restore permissions and access for authorized users.
     2. Reconnect systems or resources to the network.
@@ -217,8 +232,13 @@ In the aftermath of a personal data breach, it is critical to conduct a comprehe
 [Correction of Error (COE)](https://wa.aws.amazon.com/wat.concept.coe.en.html)
 
 1. Review the incident: Perform a thorough review of the incident, including the causes, severity, and impact. This information will be used to determine the effectiveness of the incident response plan and identify areas for improvement.
+
 2. Document lessons learned: Document lessons learned from the incident and use this information to update the incident response plan. This information should include details about the attack vector, the methods used by the attacker, and any other relevant information.
+
 3. Update the incident response plan: Based on the lessons learned, update the incident response plan to reflect any changes or improvements that should be made to the incident response process.
+
 4. Perform a root cause analysis: Conduct a root cause analysis to determine the underlying causes of the incident and to identify any additional areas for improvement.
+
 5. Update policies and procedures: Based on the results of the root cause analysis, update policies and procedures to ensure that the incident response plan is aligned with best practices and regulatory requirements.
+
 6. Implement corrective actions: Implement any necessary corrective actions to prevent similar incidents from happening in the future.
