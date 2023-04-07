@@ -6,7 +6,7 @@ The playbooks included below cover several common scenarios faced by AWS custome
 
 * Gather evidence
 * Contain and then eradicate the incident
-* recover from the incident
+* Recover from the incident
 * Conduct post-incident activities, including post-mortem and feedback processes
 
 Interested readers may also find the AWS Security Incident Response Guide (first published in June 2019) a useful guide as an overview of how the below steps were created.
