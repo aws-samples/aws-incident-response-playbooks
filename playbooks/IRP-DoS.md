@@ -134,7 +134,7 @@ From the Acquire, Preserve, Document Evidence phase, you should now have a good 
 
 ### Part 3: Eradicate the Incident
 
-By following steps 1 through to 4 in PART 2, the service is now behind a CloudFront distribution, in addition to the standard protections provided by AWS Shieldhttps://docs.aws.amazon.com/whitepapers/latest/aws-best-practices-ddos-resiliency/aws-best-practices-ddos-resiliency.pdf) . Now further refine protections by using AWS WAF.
+By following steps 1 through to 4 in PART 2, the service is now behind a CloudFront distribution, in addition to the standard protections provided by [AWS Shield](https://docs.aws.amazon.com/whitepapers/latest/aws-best-practices-ddos-resiliency/aws-best-practices-ddos-resiliency.pdf) . Now further refine protections by using AWS WAF.
 
 1. Determine if the CloudFront distribution or Application Load Balancer are protected by an AWS WAF WebACL.
 
