@@ -142,19 +142,21 @@ By following steps 1 through to 4 in PART 2, the service is now behind a CloudFr
         1. Go to the CloudFront console and click on the name of the relevant distribution
         2. Under the **General** tab, make note of the value in the AWS WAF Web ACL field
         3. Go to the AWS WAF and Shield console and select Web ACLs from the navigation pane
-        4. Locate the Web ACL with the same name as noted from step (ii) and click on the name
+        4. Locate the Web ACL with the same name as noted from step (ii) and click on the name of the Web ACL listed under **AWS WAF**
     2. For an Application Load Balancer:
         1. Go to the EC2 console and select “Load Balancers” from the “Load Balancing” menu in the navigation pane
         2. Select the name of the relevant Application Load Balancer and in the tabs below, select “Integrated services”
         3. Note the name of the Web ACL listed under **AWS WAF**
+    3. Review the Web ACL and add rules if required;
+        1. The quickest solution is to deploy a set of AWS WAF Managed Rules. These are available in the AWS Marketplace for [third-party providers](https://aws.amazon.com/marketplace/solutions/security/waf-managed-rules). There are also AWS-Managed rules available directly from AWS when you [create a new Web ACL](https://aws.amazon.com/blogs/aws/announcing-aws-managed-rules-for-aws-waf/).
+        2. Alternatively, if the application developers know what type of rules should be deployed to protect the application, work with those developers to [create the rules](https://docs.aws.amazon.com/waf/latest/developerguide/classic-web-acl-rules-creating.html), deploy the Web ACL and then go back to step (a), above.
+
 1. If it is determined that the CloudFront distribution or Application Load Balancer are not protected by a Web ACL, take one of the two following steps:
     1. If a Web ACL already exists and your CMDB shows that this Web ACL should be associated to either the CloudFront Distribution or the Application Load Balancer, go to the AWS console or AWS Command Line Interface (AWS CLI) tools and associate that resource to the Web ACL.
     2. If no reference exists to a Web ACL in the CMDB that should be associated to either the CloudFront Distribution or Application Load Balancer, there are now two possible options:
         1. If the CMDB contains references to known Web ACL rules that should be contained in a Web ACL, go ahead and create those rules and add them to a new Web ACL. Finally, associate that Web ACL to the resources to be protected.
         2. If the CMDB does not contain references to Web ACL rules that should be deployed, the quickest solution is to deploy a set of AWS WAF Managed Rules. These are available in the AWS Marketplace for [third-party providers](https://aws.amazon.com/marketplace/solutions/security/waf-managed-rules). There are also AWS-Managed rules available directly from AWS when you [create a new Web ACL](https://aws.amazon.com/blogs/aws/announcing-aws-managed-rules-for-aws-waf/).
         3. Alternatively, if the application developers know what type of rules should be deployed to protect the application, work with those developers to [create the rules](https://docs.aws.amazon.com/waf/latest/developerguide/classic-web-acl-rules-creating.html), deploy the Web ACL and then go back to step (a), above.
-
-
 
 ### Part 4: Recover from the Incident
 
@@ -163,7 +165,7 @@ By following steps 1 through to 4 in PART 2, the service is now behind a CloudFr
 * Determine the impact of the mitigations already performed
 * Identify attack signatures to attempt to eradicate or further mitigate the attack
 
-From points (9) and (10) in PART 1, review the logs obtained once the incident was detected. Now that mitigations are in place, you need to go back and obtain those metrics and logs again, and compare them to the incident metrics and logs obtained earlier. If request activity has returned to baseline levels, and the service is confirmed to be available, the attack has been mitigated: Continue to monitor the service post-attack. If the service request rate is still elevated and the service is available, the attack has been mitigated: Continue to monitor the service for potential change in attack method. If the service is unavailable, return to Part 1 and review logs and related data to determine if you have correctly identified the attack vector, or if the attacker has changed the vector in response to the mitigation.
+From points (9) and (10) in PART 1, review the logs obtained once the incident was detected. Now that mitigations are in place, you need to go back and obtain those metrics and logs again, and compare them to the incident metrics and logs obtained earlier. If request activity has returned to baseline levels, and the service is confirmed to be available, the attack has subsided: Continue to monitor the service post-attack. If the service request rate is still elevated and the service is available, the attack has been mitigated: Continue to monitor the service for potential change in attack method. If the service is unavailable, return to Part 1 and review logs and related data to determine if you have correctly identified the attack vector, or if the attacker has changed the vector in response to the mitigation, or if your mitigations need to be refined.
 
 ### Part 5: Post-Incident Activity
 
