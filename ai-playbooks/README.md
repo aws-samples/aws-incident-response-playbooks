@@ -5,13 +5,11 @@ These markdown documents are created to be used as templates only. They should b
 
 These markdown documents are written to facilitate editing and consumption into a variety of integrated development environments ("IDE"s) as guidance files. [In Kiro, these are known as "steering files"](https://kiro.dev/docs/steering/) and [in Claude Code, they are known as "skills"](https://code.claude.com/docs/en/skills). In both examples, the files are written in markdown for consumption into the relevant IDE.
 
-<<<<<<< HEAD:ai-playbooks/README.md
-Note that you need to copy the files in this repo into the correct directory in your IDE. In Kiro, we recommend setting up a new project, and defining a [workspace](https://kiro.dev/docs/steering/) and keeping your steering files in the steering directory *for the workspace*.
+Note that you need to copy the files in this repo into the correct directory in your IDE. In Kiro, we recommend setting up a new project, and defining a [workspace](https://kiro.dev/docs/steering/) and keeping your steering files in the steering directory *for the workspace*. Steering files specific to the workspace will take priority over global steering files. This also means that you don't risk having steering files in the global workspace that you don't want there, and having kiro reference those files when you are in a workspace for a project completely unrelated to those steering files. Refer to the sections below to ensure you have copied the files to the correct location for your IDE. 
 
-The markdown documents included cover several common scenarios faced by AWS customers. They outline steps based on the [NIST Computer Security Incident Handling Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r2.pdf) (Special Publication 800-61 Revision 2) and codify these steps as structured guidance that AI agents can use to assist a human operator investigate and resolve an incident. This includes the following steps outlined by NIST:
-=======
-The markdown documents included cover several common scenarios faced by AWS customers. They outline steps based on the [NIST Incident Response Recommendations and Considerations for Cybersecurity Risk Management](https://csrc.nist.gov/pubs/sp/800/61/r3/final) (Special Publication 800-61 Revision 3) and codify these steps as structured guidance that AI agents can use to assist a human operator investigate and resolve an incident. This includes the following steps outlined by NIST:
->>>>>>> upstream/master:ai-playbooks/steering/README.md
+For Kiro, users should do similar preparation to move steering files to .kiro/steering/ folder 
+
+The markdown documents included cover several common scenarios faced by AWS customers. They outline steps based on the [NIST Computer Security Incident Handling Guide](https://csrc.nist.gov/pubs/sp/800/61/r3/final) (Special Publication 800-61 Revision 3) and codify these steps as structured guidance that AI agents can use to assist a human operator investigate and resolve an incident. This includes the following steps outlined by NIST:
 
 * Gather evidence
 * Contain and then eradicate the incident
@@ -20,6 +18,10 @@ The markdown documents included cover several common scenarios faced by AWS cust
 
 ## Usage
 ### Kiro IDE
+1. Copy the `ai-playbooks/steering/steering-irp-core.md` into your workspace's `.kiro/steering` directory
+2. Copy the `ai-playbooks/steering/reference` directory and all files in it into the `.kiro/steering` directory
+
+`mkdir -p .kiro/steering && cp ai-playbooks/steering/steering-irp-core.md .kiro/steering/ && cp -r ai-playbooks/steering/reference .kiro/steering/`
 
 #### File types
 There are three categories of markdown files we have created for this AI-powered incident response solution:
@@ -73,63 +75,10 @@ flowchart TD
 The "Tool Selection Strategy" section in the core file is also a nice touch — it tells the AI to prefer MCP tools over CLI when available, without requiring us as authors to maintain two versions of every command.
 
 ### Claude Code
+1. copy `ai-playbooks/skills/CLAUDE.md` to the root directory of the project  
+2. copy all other skills file in `ai-playbooks/skills/` folder into the `.claude/skills/` folder
 
-Claude Code uses a parallel structure to the Kiro steering system, adapted to how Claude Code loads context.
-
-#### File types
-
-There are three categories of files for Claude Code:
-
-* **Skill Factory**: Use `.claude/skills/skill-irp-playbook-factory.md` to create new IR skills from existing playbooks in `playbooks/`. This skill is only invoked when you want to create new `skill-irp-<playbook>.md` skill files.
-* **CLAUDE.md (Core Router)**: The `CLAUDE.md` file at the repo root is **always loaded** by Claude Code at the start of every conversation in this directory. It serves the same role as `steering-irp-core.md` in Kiro — it defines the NIST 800-61 lifecycle, contains keyword pattern matching logic to classify the incident type, and directs Claude Code to invoke the appropriate skill.
-* **IR Skills**: The incident-specific skill files (`.claude/skills/skill-irp-*.md`) are invoked on demand. Claude Code's skill system loads them when the operator invokes them directly (e.g., `/skill-irp-credential-compromise`) or when the routing logic in `CLAUDE.md` determines the incident type and requests the relevant skill.
-
-#### Architecture mapping
-
-| Kiro Concept | Claude Code Equivalent |
-|---|---|
-| `steering-irp-core.md` (`inclusion: always`) | `CLAUDE.md` at repo root (always loaded) |
-| `steering-irp-*.md` (`inclusion: manual`) | `.claude/skills/skill-irp-*.md` (loaded on demand) |
-| Steering factory guide | `.claude/skills/skill-irp-playbook-factory.md` |
-
-#### How the files direct Claude Code
-
-`CLAUDE.md` is loaded into every conversation automatically. It acts as the orchestrator — it defines the NIST 800-61 lifecycle, contains keyword pattern matching logic to classify the incident type, and tells Claude Code which specific skill to pull in.
-
-The incident-specific skills (credential compromise, unintended data access, ransomware) are loaded on demand. Unlike the Kiro system, sibling skills do not cross-reference each other — `CLAUDE.md` is the single routing authority.
-
-The flow is identical to Kiro:
-
-```mermaid
----
-config:
-  flowchart:
-    padding: 15
----
-flowchart TD
-    A[User describes security incident] --> B[CLAUDE.md <br/> **always loaded**]
-    B --> C{Keyword Pattern <br/> Matching}
-    C -->|credential, access key, <br/> IAM user, GuardDuty| D[skill-irp-credential-compromise]
-    C -->|S3 bucket, data access, <br/> public bucket, object ACL| E[skill-irp-data-access]
-    C -->|Ransomware, ransom, <br/> encrypted files, locked out| F[skill-irp-ransomware]
-    C -->|no clear match| D
-    D --> G[Execute NIST 800-61 Lifecycle <br/> Evidence → Contain → Eradicate → Recover → Post-Incident]
-    E --> G
-    F --> G
-    G --> H{Multi-vector <br/>detected?}
-    H -->|Yes| I[Invoke additional <br/> skill]
-    I --> G
-    H -->|No| J[Root cause analysis <br/> &#40actions taken&#41 <br/> + further actions needed]
-
-    style B fill:#2d6a4f,color:#fff
-    style D fill:#1b4965,color:#fff
-    style E fill:#1b4965,color:#fff
-    style F fill:#1b4965,color:#fff
-    style C fill:#6c757d,color:#fff
-    style H fill:#6c757d,color:#fff
-```
-
-The Tool Selection Strategy section in `CLAUDE.md` tells Claude Code to prefer MCP tools (e.g., `call_aws` via the AWS API MCP Server) over CLI when available, without requiring two versions of every command.
+`cp ai-playbooks/skills/CLAUDE.md . && mkdir -p .claude/skills && find ai-playbooks/skills -name '*.md' ! -name 'CLAUDE.md' -exec cp {} .claude/skills/ \;`
 
 ## Security
 
