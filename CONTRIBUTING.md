@@ -1,61 +1,207 @@
-# Contributing Guidelines
+# Contributing to AWS Incident Response Playbooks
 
-Thank you for your interest in contributing to our project. Whether it's a bug report, new feature, correction, or additional
-documentation, we greatly value feedback and contributions from our community.
+Thank you for your interest in contributing to this project! We welcome contributions from the community to help improve and expand these incident response playbooks.
 
-Please read through this document before submitting any issues or pull requests to ensure we have all the necessary
-information to effectively respond to your bug report or contribution.
+---
 
+## Table of Contents
 
-## Reporting Bugs/Feature Requests
+- [How to Contribute](#how-to-contribute)
+- [Playbook Contributions](#playbook-contributions)
+- [AI Playbook Contributions](#ai-playbook-contributions)
+- [Contribution Guidelines](#contribution-guidelines)
+- [Testing Your Contributions](#testing-your-contributions)
+- [Inclusive Language](#inclusive-language)
+- [Security Issue Notifications](#security-issue-notifications)
+- [Licensing](#licensing)
 
-We welcome you to use the GitHub issue tracker to report bugs or suggest features.
+---
 
-When filing an issue, please check existing open, or recently closed, issues to make sure somebody else hasn't already
-reported the issue. Please try to include as much information as you can. Details like these are incredibly useful:
+## How to Contribute
 
-* A reproducible test case or series of steps
-* The version of our code being used
-* Any modifications you've made relevant to the bug
-* Anything unusual about your environment or deployment
+1. **Fork** the repository
+2. **Create a branch** for your contribution (`feature/new-playbook-name` or `fix/description`)
+3. **Make your changes** following the guidelines below
+4. **Test your changes** (see Testing section)
+5. **Submit a Pull Request** with a clear description of what you've changed and why
 
+### Types of Contributions We Welcome
 
-## Contributing via Pull Requests
-Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
+- New incident response playbooks for scenarios not yet covered
+- Updates to existing playbooks (new services, updated CLI commands, corrected console paths)
+- AI playbook variants (steering files for Kiro, skills for Claude Code)
+- Automation pattern examples
+- Bug fixes (broken links, typos, formatting)
+- Translations
+- Improvements to documentation and guides
 
-1. You are working against the latest source on the *master* branch.
-2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
-3. You open an issue to discuss any significant work - we would hate for your time to be wasted.
+---
 
-To send us a pull request, please:
+## Playbook Contributions
 
-1. Fork the repository.
-2. Modify the source; please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
-3. Ensure local tests pass.
-4. Commit to your fork using clear commit messages.
-5. Send us a pull request, answering any default questions in the pull request interface.
-6. Pay attention to any automated CI failures reported in the pull request, and stay involved in the conversation.
+### Use the Template
 
-GitHub provides additional document on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
-[creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
+All new playbooks **must** follow the standard template: [`PLAYBOOK_TEMPLATE.md`](PLAYBOOK_TEMPLATE.md)
 
+The template ensures consistency across playbooks and includes all required sections:
+- Metadata (scenario, NIST phase mapping, severity indicators)
+- Scope & Assumptions
+- Prerequisites
+- Detection & Analysis
+- Containment
+- Eradication
+- Recovery
+- Post-Incident Activity
+- Automation Hooks
+- Regulatory Considerations
+- References
 
-## Finding contributions to work on
-Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any 'help wanted' issues is a great place to start.
+### Playbook Quality Checklist
 
+Before submitting a playbook, verify:
 
-## Code of Conduct
-This project has adopted the [Amazon Open Source Code of Conduct](https://aws.github.io/code-of-conduct).
-For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of-conduct-faq) or contact
-opensource-codeofconduct@amazon.com with any additional questions or comments.
+- [ ] Follows the `PLAYBOOK_TEMPLATE.md` structure
+- [ ] All CLI commands use AWS CLI v2 syntax
+- [ ] Console paths are current (verify in the AWS Console)
+- [ ] All referenced services and features are Generally Available (not preview/beta)
+- [ ] NIST SP 800-61r3 lifecycle phases are correctly mapped
+- [ ] Severity indicators align with the [Triage Guide](TRIAGE_GUIDE.md)
+- [ ] No customer-specific information, account IDs, or PII included
+- [ ] References section includes links to relevant AWS documentation
+- [ ] Regulatory considerations reference the [Regulatory Context](REGULATORY_CONTEXT.md) document
+- [ ] Inclusive language guidelines are followed (see below)
 
+### Updating Existing Playbooks
 
-## Security issue notifications
-If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public github issue.
+When updating an existing playbook:
+- Update the "Last Updated" date in the metadata table
+- Note what changed in your PR description
+- If adding new services or features, verify they are GA
+- Ensure the update doesn't break the overall flow of the playbook
 
+---
+
+## AI Playbook Contributions
+
+### Overview
+
+The `ai-playbooks/` directory contains playbooks designed to be consumed by AI-powered IDEs. These come in two formats:
+
+| Format | Location | IDE |
+|---|---|---|
+| Steering files | `ai-playbooks/steering/reference/` | [Kiro](https://kiro.dev/) |
+| Skills | `ai-playbooks/skills/` | [Claude Code](https://code.claude.com/) |
+
+### Creating AI Playbook Variants
+
+When contributing a new AI playbook:
+
+1. **Start with the human playbook** — The AI variant should be derived from an existing human-readable playbook in `playbooks/`
+2. **Use the factory guides:**
+   - For Kiro: Use `ai-playbooks/steering/steering-factory/` as your guide
+   - For Claude Code: Use `ai-playbooks/skills/skill-irp-builder.md` or `skill-irp-playbook-factory.md`
+3. **Update the routing:**
+   - For Kiro: Update keyword patterns in `ai-playbooks/steering/steering-irp-core.md`
+   - For Claude Code: Update routing in `ai-playbooks/skills/CLAUDE.md`
+4. **Test with the IDE** — Verify the AI agent correctly routes to your playbook based on incident description keywords
+
+### AI Playbook Quality Checklist
+
+- [ ] Derived from a corresponding human playbook
+- [ ] Front matter includes correct `inclusion` type (`manual` for incident-specific playbooks)
+- [ ] Keyword patterns are specific enough to avoid false routing
+- [ ] CLI commands are formatted for AI consumption (complete, copy-pasteable)
+- [ ] Decision points are clearly structured for AI reasoning
+- [ ] Both Kiro steering and Claude Code skill versions are provided (preferred, not required)
+
+### AI-Assisted Contributions
+
+We welcome contributions that were drafted with AI assistance. When submitting AI-assisted contributions:
+
+- **Disclose AI usage** — Note in your PR description if AI tools were used in drafting
+- **Verify all technical content** — AI can hallucinate service names, API calls, and console paths. Every command and reference must be human-verified
+- **Test the playbook** — AI-generated playbooks must pass the same testing requirements as human-written ones
+- **Review for coherence** — Ensure the playbook reads naturally and doesn't have repetitive or contradictory sections
+
+---
+
+## Contribution Guidelines
+
+### Writing Style
+
+- Write in clear, direct language appropriate for incident responders under pressure
+- Use active voice ("Revoke the credentials" not "The credentials should be revoked")
+- Be specific about what to look for and what actions to take
+- Include both CLI commands and console path references where applicable
+- Use American English spelling (behavior, color, analyze, organization, authorize) for consistency across the repository
+
+### Formatting
+
+- Use Markdown formatting consistently
+- Code blocks must specify the language (```bash, ```json, etc.)
+- Tables should be used for structured data (findings, services, parameters)
+- Use blockquotes (>) for important warnings or notes
+- Internal links should use relative paths
+
+### Scope
+
+- Playbooks should focus on **AWS-specific** incident response
+- Keep content within the shared responsibility model — we cover security **in** the cloud
+- Do not include proprietary tooling or vendor-specific solutions (beyond AWS services)
+- Reference external tools generically (e.g., "your SIEM" not "Splunk")
+
+---
+
+## Testing Your Contributions
+
+### Minimum Testing Requirements
+
+1. **Link validation** — All internal and external links resolve correctly
+2. **CLI command verification** — Run commands against a test account to verify syntax and output
+3. **Console path verification** — Navigate the referenced console paths to confirm they exist
+4. **Markdown rendering** — Preview your markdown to ensure tables, code blocks, and formatting render correctly
+
+### Recommended Testing
+
+4. **Scenario walkthrough** — Walk through the playbook steps in a test/sandbox AWS account
+5. **Peer review** — Have someone unfamiliar with the scenario follow the playbook
+6. **AI playbook testing** — For AI variants, test that the IDE correctly routes to and executes the playbook
+
+### Testing Tools
+
+- [markdownlint](https://github.com/DavidAnson/markdownlint) — Markdown style and consistency
+- [markdown-link-check](https://github.com/tcort/markdown-link-check) — Verify all links resolve
+- AWS CLI with `--dry-run` flags where available
+- A dedicated AWS test account (never test against production)
+
+---
+
+## Inclusive Language
+
+All contributions must use inclusive language. The following terms should be avoided:
+
+| Don't Use | Use Instead |
+|---|---|
+| master | primary, main, leader, controller |
+| slave | replica, secondary, follower, responder |
+| whitelist | allowlist, approved list, inclusion list |
+| blacklist | denylist, blocklist, exclusion list |
+| whiteday(s) | clear day(s), allowed day(s) |
+| blackday(s) | blocked day(s) |
+
+---
+
+## Security Issue Notifications
+
+If you discover a potential security issue in this project, please notify AWS/Amazon Security via our [vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/) or directly via email to [aws-security@amazon.com](mailto:aws-security@amazon.com).
+
+**Please do not create a public GitHub issue for security vulnerabilities.**
+
+---
 
 ## Licensing
 
-See the [LICENSE](LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
+See the [LICENSE](LICENSE) file for details. By contributing, you agree that your contributions will be licensed under the same terms.
 
-We may ask you to sign a [Contributor License Agreement (CLA)](http://en.wikipedia.org/wiki/Contributor_License_Agreement) for larger changes.
+- Documentation: Creative Commons Attribution-ShareAlike 4.0 International License
+- Sample code: MIT-0 License
