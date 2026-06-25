@@ -45,7 +45,7 @@ This playbook does **not** cover:
 | External Report | Customer/individual report of data misuse or exposure | — |
 
 > 📌 Amazon Macie sensitive data discovery jobs and automated discovery provide the primary signal for personal data classification. See the [Macie finding types reference](https://docs.aws.amazon.com/macie/latest/user/findings-types.html) for the current list.
-
+>
 > 📌 GuardDuty finding types are updated regularly. See the [GuardDuty finding types reference](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html) for the current list.
 
 ### Severity Classification
@@ -82,9 +82,9 @@ The following services each contribute to your ability to detect, scope, and doc
 - [ ] **Data classification tags** applied to all data stores (e.g., `DataClassification: PII`, `DataClassification: PHI`, `DataClassification: PCI`) — enables rapid identification of affected data categories during an incident
 
 > 🤖 **Automation opportunity:** Use Macie automated sensitive data discovery with classification jobs to maintain a continuously updated inventory of where personal data resides. Combine with AWS Config rules to alert when untagged buckets contain Macie-identified PII.
-
+>
 > 📌 **Don't have Macie enabled?** Macie can be enabled *during* an incident — it doesn't require historical data to be useful. Enable it on the affected bucket(s) and run an on-demand classification job. Initial results are typically available within 1–4 hours, well within the 72-hour GDPR notification window. If Macie is not available, see [Section 2.2 — Alternative classification approaches](#without-macie-alternative-classification-approaches) for manual methods.
-
+>
 > 📖 **Reference:** [SEC10-BP06 Pre-deploy tools](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_deploy_tools.html) — AWS Well-Architected Framework recommends pre-deploying investigation and response tooling so capabilities are available immediately when needed.
 
 ### 1.2 IAM & Access Prerequisites
@@ -125,7 +125,7 @@ Personal data breach escalation is time-critical due to hard regulatory deadline
 6. **Within 24 hours:** Notification decision made and documented (notify or documented justification for non-notification)
 
 > ⚠️ **Critical:** The Privacy Officer / DPO must be notified within **1 hour** of personal data involvement being confirmed. The 72-hour GDPR notification clock starts at awareness — delays in internal escalation directly consume the notification window.
-
+>
 > 📖 **Reference:** [SEC10-BP01 Identify key personnel and external resources](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_identify_personnel.html) — pre-identify all stakeholders (including legal, privacy, and communications) and establish clear escalation paths before an incident occurs.
 
 ### 1.4 Game Day Guidance
@@ -298,6 +298,7 @@ Run the following queries from [`resources/athena-queries-personal-data-breach.s
 This is the critical question for notification obligations. Data accessed within AWS (e.g., by another AWS service or account) may have different risk implications than data confirmed exfiltrated to an external location.
 
 Indicators of exfiltration:
+
 - GuardDuty `Exfiltration:S3/MaliciousIPCaller` or `Exfiltration:S3/AnomalousBehavior` findings
 - CloudTrail `GetObject` calls from IP addresses outside known AWS ranges
 - VPC Flow Logs showing large outbound data transfers to unknown IPs
@@ -357,7 +358,7 @@ For each jurisdiction where affected individuals reside, assess notification obl
 - Even for lower-severity incidents, AWS CIRT can assist with CloudTrail analysis, Macie interpretation, and evidence documentation that supports regulatory submissions. Consider engaging if your team lacks experience with Athena queries against CloudTrail data events.
 
 > 📌 You do not need the Security Incident Response service to get help from AWS CIRT. All AWS customers can request CIRT assistance through a support case, regardless of support plan level.
-
+>
 > The AWS Security Incident Response service can assist with evidence gathering and documentation that supports regulatory notification requirements. They do not provide legal advice on notification obligations.
 
 ---
@@ -366,12 +367,12 @@ For each jurisdiction where affected individuals reside, assess notification obl
 
 > **CSF 2.0 Function:** Respond (Contain)
 > **Goal:** Stop further data access, preserve evidence for regulatory investigation, initiate legal hold, and document the notification clock.
-
+>
 > 📌 **Note:** Technical containment of the underlying incident (credential revocation, network isolation, etc.) may already be handled by the parallel technical playbook (IRP-CredCompromise, IRP-DataAccess, IRP-InsiderThreat). This section focuses on containment actions specific to the personal data breach workstream.
 
 ### 3.1 Containment Decision
 
-```
+```text
 Is personal data still actively being accessed or exfiltrated?
 │
 ├── YES (active access ongoing)
@@ -470,6 +471,7 @@ This record establishes the start of the notification clock for GDPR (72 hours),
 Legal hold prevents the routine deletion or modification of evidence that may be required by regulators months or years after the incident. Implement legal hold across all systems that may contain evidence of the breach scope, timeline, or response actions.
 
 Place legal hold on:
+
 - [ ] All S3 access logs for affected buckets (full retention period)
 - [ ] CloudTrail logs for affected accounts (full retention period)
 - [ ] VPC Flow Logs for affected VPCs
@@ -511,7 +513,7 @@ After containment, document and confirm the following before any data modificati
 
 > **CSF 2.0 Function:** Respond (Eradicate) · Recover
 > **Goal:** Confirm the full scope of personal data affected, determine notification content, prepare regulatory submissions, and implement individual protections.
-
+>
 > 📌 **Note:** Technical eradication (removing threat actor access, closing vulnerabilities) is handled by the parallel technical playbook. This section focuses on the regulatory, notification, and individual protection workstream.
 
 ### 4.1 Full Scope Determination
@@ -521,6 +523,7 @@ After containment, document and confirm the following before any data modificati
 Before preparing notifications, confirm the following with as much precision as possible:
 
 **Data scope:**
+
 - [ ] Exact data categories involved (names, emails, government IDs, health data, financial data, etc.)
 - [ ] Number of unique individuals affected (or best estimate with confidence range)
 - [ ] Jurisdictions of affected individuals (determines which regulations apply)
@@ -529,6 +532,7 @@ Before preparing notifications, confirm the following with as much precision as 
 - [ ] Whether data has been confirmed exfiltrated or only accessed
 
 **Individual impact assessment:**
+
 - [ ] What is the likely harm to individuals? (Identity theft, financial fraud, discrimination, reputational damage)
 - [ ] Are vulnerable populations affected? (Children, patients, employees)
 - [ ] Can affected individuals be individually identified for notification?
@@ -578,6 +582,7 @@ Each regulatory notification should include (adapt per jurisdiction requirements
 **AWS Artifact for compliance documentation:**
 
 Use [AWS Artifact](https://console.aws.amazon.com/artifact/) to retrieve:
+
 - AWS SOC 2 Type II report (demonstrates AWS infrastructure security controls)
 - AWS PCI-DSS Attestation of Compliance (if PCI data involved)
 - AWS ISO 27001 certificate
@@ -590,6 +595,7 @@ These documents may be requested by regulators to demonstrate the security postu
 > `[Communications Lead]` manages notification delivery. `[Customer Support Lead]` manages incoming inquiries.
 
 **Notification delivery:**
+
 - [ ] Individual notification content finalized and approved by Legal
 - [ ] Notification delivery method determined (email, postal mail, public notice)
 - [ ] Dedicated support channel established (phone line, email address, FAQ page)
@@ -598,6 +604,7 @@ These documents may be requested by regulators to demonstrate the security postu
 - [ ] Delivery confirmation tracked (email delivery receipts, postal tracking)
 
 **Individual protection measures (if applicable):**
+
 - [ ] Credit monitoring service enrolled for affected individuals (if government IDs or financial data exposed)
 - [ ] Identity protection service offered (if Tier 1 or Tier 2 data exposed)
 - [ ] Password reset forced for affected accounts (if credentials exposed)
@@ -805,7 +812,7 @@ See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obl
 
 ### C.1 Regulator Notification Template (GDPR Art. 33)
 
-```
+```text
 PERSONAL DATA BREACH NOTIFICATION
 Submitted pursuant to Article 33 of the General Data Protection Regulation
 
@@ -847,7 +854,7 @@ Submitted pursuant to Article 33 of the General Data Protection Regulation
 
 ### C.2 Individual Notification Template
 
-```
+```text
 Subject: Important Notice About Your Personal Data
 
 Dear [Name / "Valued Customer"],
@@ -895,7 +902,7 @@ Sincerely,
 
 ### C.3 Internal Stakeholder Briefing Template
 
-```
+```text
 PERSONAL DATA BREACH — INTERNAL BRIEFING
 Classification: CONFIDENTIAL — DO NOT DISTRIBUTE EXTERNALLY
 

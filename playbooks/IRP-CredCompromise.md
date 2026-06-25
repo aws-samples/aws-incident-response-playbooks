@@ -77,7 +77,7 @@ The following services each contribute to your ability to detect, investigate, a
 - [ ] **S3 bucket for CloudTrail logs** has Object Lock or versioning enabled — protects audit trail from tampering by a threat actor who gains administrative access
 
 > 🤖 **Automation opportunity:** Deploy the [AWS Security Hub Automated Response and Remediation (SHARR)](https://aws.amazon.com/solutions/implementations/automated-security-response-on-aws/) solution to auto-remediate common IAM findings.
-
+>
 > 📖 **Reference:** [SEC10-BP06 Pre-deploy tools](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_deploy_tools.html) — AWS Well-Architected Framework recommends pre-deploying investigation and response tooling so capabilities are available immediately when needed.
 
 ### 1.2 IAM & Access Prerequisites
@@ -186,6 +186,7 @@ For detailed Athena queries to investigate credential usage (source IP analysis,
 **Quick CloudTrail Console approach (no Athena required):**
 
 If Athena is not configured, you can investigate directly in the CloudTrail console:
+
 1. Navigate to **CloudTrail → Event history**
 2. Filter by **User name** = the IAM user under investigation
 3. Review source IPs — compare against known corporate IP ranges
@@ -222,7 +223,7 @@ For P1, P2, or P3 incidents, consider engaging AWS for support. AWS Support and 
 
 The goal of containment is to disable the credential so it can no longer be used, while understanding the impact of that action. Deactivating (not deleting or revoking) is preferred because it allows you to: (1) observe if legitimate services or users are impacted, (2) retain the credential ID for CloudTrail investigation, and (3) reverse the action quickly if the alert turns out to be a false positive.
 
-```
+```text
 Has the credential been confirmed used by a threat actor?
 │
 ├── YES (confirmed unauthorized use from unfamiliar source)
@@ -252,7 +253,6 @@ The containment approach depends on the type of credential involved. In all case
 2. **Monitor CloudTrail** for the next 30 minutes to confirm the credential is no longer being used. If you see continued activity from the same `accessKeyId`, the deactivation may not have propagated yet (allow a few minutes) or additional credentials may be in play.
 3. **Note any service disruption** — if legitimate applications were using this key, they will begin failing. Document what breaks so you can address it during recovery.
 
-
 #### If the credential is a console password:
 
 1. **Attach an explicit deny-all inline policy** to the IAM user. This immediately blocks all API and console actions while preserving the user account for investigation.
@@ -279,11 +279,13 @@ Short-term credentials obtained via AWS STS are associated with an IAM role and 
 #### For all credential types — verify containment:
 
 After taking containment action, verify effectiveness by monitoring CloudTrail for the next 30 minutes for ongoing credential use. Filter by:
+
 - The specific `accessKeyId` (for long-term keys)
 - The IAM user name (for console access)
 - The role name and session name (for STS credentials)
 
 If activity continues from the same principal, the threat actor may have established persistence through additional credentials. Check for:
+
 - Additional access keys created on the same or other users
 - New IAM roles with trust policies allowing assumption from external accounts
 - Lambda functions or other compute resources with attached roles
@@ -291,7 +293,6 @@ If activity continues from the same principal, the threat actor may have establi
 #### Lateral movement check:
 
 If the credential had permissions to assume roles in other accounts (cross-account access), check CloudTrail for `AssumeRole` calls to other accounts. If confirmed, repeat containment steps in those accounts.
-
 
 ### 3.3 Document Containment Actions
 
@@ -328,6 +329,7 @@ Common root causes for IAM credential compromise:
 - **Lack of rotation:** Long-lived access key never rotated, increasing the window of exposure
 
 Use the evidence documented in Part 2 to determine:
+
 - Where did the threat actor access from? (Geolocation, VPN/proxy, known malicious infrastructure)
 - When did unauthorized access begin? (First API call from the threat actor's IP)
 - How did the threat actor obtain the credential? (Check for public exposure, `GetSecretValue` access, phishing reports)
@@ -355,7 +357,7 @@ When a credential is compromised, threat actors commonly create additional crede
 - [ ] Any credentials stored in application configuration that the threat actor could have read (database passwords, API keys, etc.)
 
 > ⚠️ **If you discover additional compromised credentials or access paths during eradication, return to Part 3 (Contain) and deactivate those credentials before continuing.** Eradication is iterative — it's common to cycle between containment and eradication multiple times.
-
+>
 > 📌 **Beyond credentials:** If CloudTrail shows the threat actor created compute resources, modified resource policies, or took other actions beyond credential manipulation, consult the relevant playbook for eradication guidance specific to those resource types. For a comprehensive reference of persistence techniques observed in AWS environments, see the [Threat Technique Catalog for AWS](https://aws-samples.github.io/threat-technique-catalog-for-aws/).
 
 ### 4.3 Eradication Validation
@@ -503,6 +505,7 @@ For detailed Athena queries, GuardDuty CLI commands, and IAM Access Analyzer inv
 📁 [`resources/athena-queries-credential-compromise.sql`](resources/athena-queries-credential-compromise.sql)
 
 These queries cover:
+
 - All API activity for a specific access key
 - Source IP and user agent analysis (distinguishing legitimate vs. unauthorized usage)
 - Persistence detection (IAM mutations, role creation, policy changes)

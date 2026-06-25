@@ -78,7 +78,7 @@ The following services each contribute to your ability to detect, investigate, a
 - [ ] **AWS Security Lake** enabled — centralizes security data across services for cross-service correlation and analysis
 
 > 🤖 **Automation opportunity:** Use Macie automated sensitive data discovery to continuously classify data in S3 buckets. Configure EventBridge rules to alert on Macie HIGH findings.
-
+>
 > 📖 **Reference:** [SEC10-BP06 Pre-deploy tools](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_deploy_tools.html) — AWS Well-Architected Framework recommends pre-deploying investigation and response tooling so capabilities are available immediately when needed.
 
 ### 1.2 IAM & Access Prerequisites
@@ -164,7 +164,7 @@ Not every alert is a confirmed incident. The purpose of triage is to quickly det
 Whether the activity is confirmed malicious or still under investigation, document the current state of the affected data stores and access patterns. For data access scenarios, the primary evidence sources are CloudTrail (with S3 data events), S3 server access logs, and Macie findings. The priority here is *documenting what you observe* rather than copying logs to a separate location.
 
 > 📌 **Note on evidence storage:** CloudTrail logs and S3 server access logs persist in their configured destinations — they don't disappear if you don't copy them immediately. If you have a dedicated forensic S3 bucket with Object Lock, export findings there for tamper protection. If you don't, that's fine — the primary logs, findings in the console, and notes in your IR ticket are sufficient for most investigations.
-
+>
 > ⚠️ **Do not modify bucket policies or revoke access before documenting current state.** Capture the current configuration first.
 
 **Document the following:**
@@ -189,6 +189,7 @@ For detailed Athena queries to investigate data access (bulk read detection, pri
 **Quick CloudTrail Console approach (no Athena required):**
 
 If Athena is not configured, you can investigate directly in the CloudTrail console:
+
 1. Navigate to **CloudTrail → Event history**
 2. Filter by **Event source** = `s3.amazonaws.com` and **Event name** = `GetObject`
 3. Review source IPs and principals — compare against known legitimate access patterns
@@ -216,7 +217,7 @@ For P1, P2, or P3 incidents, consider engaging AWS for support. AWS Support and 
 - **AWS Support** (any support plan): Open a support case requesting assistance from the AWS Customer Incident Response Team (CIRT). Include the finding ID(s), the affected data stores, and a summary of the anomalous access you have observed.
 
 > 📌 You do not need the Security Incident Response service to get help from experts. All AWS customers can request CIRT assistance through a support case, regardless of support plan level. For P3 (anomalous access patterns, not yet confirmed), AWS CIRT can help you determine whether the activity is unauthorized or legitimate.
-
+>
 > 🤖 **Automation opportunity:** EventBridge rule on Macie HIGH-severity findings → auto-create Security Incident Response case.
 
 ---
@@ -230,7 +231,7 @@ For P1, P2, or P3 incidents, consider engaging AWS for support. AWS Support and 
 
 The goal of containment is to close the access path so data can no longer be reached by the threat actor, while understanding the impact of that action on legitimate users. Restricting (not deleting) is preferred because it allows you to: (1) observe if legitimate services are impacted, (2) retain the configuration for investigation, and (3) reverse the action if needed.
 
-```
+```text
 Is data actively being exfiltrated RIGHT NOW?
 │
 ├── YES (ongoing bulk reads, active transfer)
@@ -508,6 +509,7 @@ For detailed Athena queries, S3 server access log analysis, and CLI commands rel
 📁 [`resources/athena-queries-data-access.sql`](resources/athena-queries-data-access.sql)
 
 These queries cover:
+
 - All S3 data access events for a specific bucket
 - Top accessors of a bucket (identifying anomalous principals)
 - Bulk data access detection (high-volume reads in short time)

@@ -87,7 +87,7 @@ The following services each contribute to your ability to detect, absorb, and re
 - [ ] **Shield Advanced proactive engagement** configured (requires Route 53 health checks) — SRT contacts you automatically when health checks fail during detected events
 
 > 🤖 **Automation opportunity:** Use AWS Firewall Manager to centrally deploy WAF rules and Shield Advanced protections across all accounts in your organization. EventBridge rules can trigger automatic WAF rule updates when Shield Advanced detects an event.
-
+>
 > 📖 **Reference:** [SEC10-BP06 Pre-deploy tools](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_deploy_tools.html) — AWS Well-Architected Framework recommends pre-deploying investigation and response tooling so capabilities are available immediately when needed.
 
 ### 1.2 IAM & Access Prerequisites
@@ -212,6 +212,7 @@ Not every traffic spike is an attack. Legitimate events (product launches, marke
 **Investigation Queries (Athena):**
 
 For detailed log analysis queries (CloudFront, WAF, VPC Flow Logs), see [`resources/athena-queries-dos.sql`](resources/athena-queries-dos.sql). Queries cover:
+
 - Top source IPs by request volume
 - Application-layer attack pattern detection
 - WAF rule effectiveness analysis
@@ -234,6 +235,7 @@ For detailed log analysis queries (CloudFront, WAF, VPC Flow Logs), see [`resour
 **P1 — Service fully unavailable, attack sustained:**
 
 Engage all available AWS resources immediately:
+
 - **Shield Advanced SRT:** Navigate to the [AWS Shield console](https://console.aws.amazon.com/shield/), review the active event, select **Contact the SRT**. SRT can directly modify your WAF rules and create custom mitigations.
 - **AWS Support:** Open a case with Critical severity. Include Shield event ID, affected resources, and current mitigation status.
 - **AWS Security Incident Response service (if subscribed):** Sign into [AWS Security Incident Response](https://console.aws.amazon.com/security-ir/) via the console, choose **Create Case**, select **Resolve case with AWS**, and choose **Active Security Incident**.
@@ -250,7 +252,7 @@ Engage all available AWS resources immediately:
 - **Shield Advanced:** Review the Shield console for event classification. Shield Advanced distinguishes between DDoS attacks and legitimate traffic spikes.
 
 > 📌 You do not need the Security Incident Response service to get help from AWS CIRT. All AWS customers can request CIRT assistance through a support case, regardless of support plan level.
-
+>
 > 🤖 **Automation opportunity:** Configure Shield Advanced proactive engagement so the SRT contacts you automatically when Route 53 health checks fail during a detected DDoS event. This eliminates the need to manually engage during a P1.
 
 ---
@@ -264,7 +266,7 @@ Engage all available AWS resources immediately:
 
 For DoS/DDoS incidents, containment is almost always urgent. Unlike credential compromise where you may observe before acting, availability loss is immediate customer impact. The decision tree focuses on *how aggressively* to contain rather than *whether* to contain.
 
-```
+```text
 Is the service currently unavailable or severely degraded?
 │
 ├── YES (P1/P2 — active impact)
@@ -286,6 +288,7 @@ Is the service currently unavailable or severely degraded?
 
 1. **Verify Shield Advanced auto-mitigation is active**
    Check the Shield console for active mitigations. For resources protected by Shield Advanced, AWS automatically applies network-layer mitigations.
+
    ```bash
    # Check active attacks and mitigations
    aws shield describe-attack --attack-id <attack-id>
@@ -304,7 +307,8 @@ Is the service currently unavailable or severely degraded?
 
 **Application-Layer (Layer 7) Attack Containment:**
 
-4. **Deploy WAF rate-based rule with aggressive threshold**
+1. **Deploy WAF rate-based rule with aggressive threshold**
+
    ```bash
    # Create an emergency rate-based rule (lower threshold than normal)
    aws wafv2 update-web-acl \
@@ -333,16 +337,16 @@ Is the service currently unavailable or severely degraded?
      ]'
    ```
 
-5. **Deploy geographic restriction (if attack is geographically concentrated)**
+2. **Deploy geographic restriction (if attack is geographically concentrated)**
    If traffic analysis shows attack sources concentrated in specific countries that don't serve your legitimate user base, deploy a WAF geographic match rule or CloudFront geographic restriction. Use WAF for granular control (per-endpoint), or CloudFront restrictions for blanket blocking.
 
-6. **Deploy WAF IP blocklist for identified attack sources**
+3. **Deploy WAF IP blocklist for identified attack sources**
    Create or update a WAF IP set with the highest-volume attack source CIDRs identified from log analysis. Reference the IP set in a WAF block rule with high priority.
 
-7. **Adjust Auto Scaling to manage cost exposure**
+4. **Adjust Auto Scaling to manage cost exposure**
    Set a maximum capacity ceiling to prevent runaway scaling costs while maintaining enough capacity for legitimate traffic. For ECS services, adjust the scalable target max-capacity similarly.
 
-8. **Enable CloudFront origin failover (if origin is overwhelmed)**
+5. **Enable CloudFront origin failover (if origin is overwhelmed)**
    If the primary origin is saturated, configure CloudFront to fail over to a static maintenance page or cached content served from S3. This preserves some user experience while protecting the origin.
 
 > 🤖 **Automation opportunity:** EventBridge rule triggered by Shield Advanced `DDoSDetected` metric can automatically invoke a Lambda function that deploys pre-configured WAF rate-based rules and notifies the IR team via SNS.
@@ -428,6 +432,7 @@ Use evidence collected in Part 2 to characterize the attack vector, peak magnitu
 ### 4.3 Recovery Actions
 
 1. **Restore normal Auto Scaling configuration**
+
    ```bash
    # Return Auto Scaling to normal parameters
    aws autoscaling update-auto-scaling-group \
@@ -566,6 +571,7 @@ Athena queries for CloudFront access logs, WAF logs, VPC Flow Logs, and CloudWat
 📄 **[`resources/athena-queries-dos.sql`](resources/athena-queries-dos.sql)**
 
 The file contains queries for:
+
 - **CloudFront:** Top source IPs, application-layer attack pattern detection, User-Agent fingerprinting
 - **WAF:** Blocked/counted request analysis, rate-based rule effectiveness
 - **VPC Flow Logs:** Volumetric attack source identification, protocol/port distribution
@@ -595,7 +601,7 @@ See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obl
 | APRA CPS 234 (Australia) | Material information security incident affecting availability | Notify APRA within 72 hours; notify affected persons as soon as practicable |
 
 > ⚠️ For NIS2 and DORA: The clock starts at **awareness** of the significant impact, not when the attack begins. Availability incidents that breach SLA thresholds are reportable even without data compromise. When in doubt, assume notification is required and consult Legal immediately.
-
+>
 > 📌 **Shield Advanced subscribers:** AWS provides attack forensics reports that can support regulatory notification requirements. Request these from the SRT during or after engagement.
 
 ---
@@ -637,11 +643,13 @@ Target: SNS topic → IR team on-call pager + Slack channel.
 **Rule 3: CloudWatch Composite Alarm → WAF Rule Tightening**
 
 Configure a CloudWatch composite alarm combining:
+
 - ALB 5xx rate > 10% for 2 consecutive periods
 - ALB request count > 5x baseline for 2 consecutive periods
 - Target response time > 5 seconds for 2 consecutive periods
 
 Target: Step Functions workflow that:
+
 1. Lowers WAF rate-based rule threshold
 2. Enables WAF Bot Control (if not already active)
 3. Creates Security Hub custom finding
@@ -650,6 +658,7 @@ Target: Step Functions workflow that:
 ### Shield Advanced Proactive Engagement
 
 When configured, the SRT will automatically contact your designated operations team when:
+
 - A Shield Advanced DDoS event is detected AND
 - Associated Route 53 health checks transition to UNHEALTHY
 

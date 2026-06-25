@@ -91,7 +91,7 @@ The following services each contribute to your ability to detect, investigate, a
 - [ ] **VPC Flow Logs** enabled for all production VPCs — supports investigation of lateral movement and C2 communication
 
 > 🤖 **Automation opportunity:** Deploy an EventBridge rule that triggers automatic EBS snapshot creation when GuardDuty generates a malware finding for an EC2 instance. This preserves the pre-encryption state. See [Appendix D](#appendix-d--automation-hooks) for implementation.
-
+>
 > 📖 **Reference:** [SEC10-BP06 Pre-deploy tools](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_deploy_tools.html) — AWS Well-Architected Framework recommends pre-deploying investigation and response tooling so capabilities are available immediately when needed.
 
 ### 1.2 IAM & Access Prerequisites
@@ -137,7 +137,7 @@ Clear communication paths reduce confusion during high-pressure incidents. Ranso
 4. **Status updates:** IR Lead provides updates every 15 minutes (P1), every 1 hour (P2), or at key milestones (P3/P4).
 
 > ⚠️ **Ransom payment decisions** require Executive Sponsor and Legal involvement. IR Lead does not have authority to approve or deny payment. Consult your organization's Legal counsel and cyber insurance provider.
-
+>
 > 📖 **Reference:** [SEC10-BP01 Identify key personnel and external resources](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_identify_personnel.html) — recommends identifying and documenting internal and external resources and contact information ahead of time.
 
 ### 1.4 Game Day Guidance
@@ -150,6 +150,7 @@ Suggested tabletop scenario:
 > *"A threat actor has compromised an IAM user's access key (obtained from a phishing campaign targeting developers). The key has PowerUserAccess in a production account. Over the past 2 hours, the threat actor has: (1) created a new KMS key in us-east-1, (2) begun re-encrypting EBS volumes attached to production EC2 instances with the threat actor-controlled key, (3) suspended versioning on three S3 buckets and is bulk-deleting objects while uploading RANSOM_NOTE.txt files, and (4) deleted 5 RDS automated snapshots. Your GuardDuty finding fired 15 minutes ago. The threat actor appears to still be active. You have AWS Backup Vault Lock enabled on your primary backup vault, but you're unsure if all critical resources are covered by backup plans."*
 
 Exercise should validate:
+
 - Speed of credential revocation and SCP deployment
 - Backup integrity verification process
 - Cross-account snapshot copy procedures
@@ -215,6 +216,7 @@ For detailed Athena queries to investigate ransomware activity (KMS operations, 
 📁 [`resources/athena-queries-ransomware.sql`](resources/athena-queries-ransomware.sql)
 
 These queries cover:
+
 - KMS key creation and encryption operations by a suspected principal
 - Bulk deletion activity across S3, EBS, RDS, and AWS Backup
 - Snapshot operations (deletion, cross-account sharing, copying)
@@ -246,6 +248,7 @@ For P1, P2, or P3 incidents, consider engaging AWS for support. Ransomware recov
 > 📌 You do not need the Security Incident Response service to get help from AWS CIRT. All AWS customers can request CIRT assistance through a support case, regardless of support plan level.
 
 AWS CIRT can assist with:
+
 - Scoping the extent of destructive operations
 - Validating backup integrity and advising on recovery sequencing
 - Providing threat intelligence on the threat actor's tactics
@@ -265,7 +268,7 @@ AWS CIRT can assist with:
 
 For ransomware, containment speed is paramount. Every minute of delay means more data encrypted or deleted. Unlike other incident types where you may investigate before acting, active data destruction requires immediate action.
 
-```
+```text
 Is active encryption/deletion in progress?
 │
 ├── YES (threat actor still active)
@@ -486,6 +489,7 @@ Common root causes for cloud-native ransomware:
 > 📌 This is not an exhaustive list. Root causes vary by environment and threat actor. Use evidence from Part 2 to identify the specific initial access vector for your incident.
 
 Use evidence collected in Part 2 to trace:
+
 1. Initial access vector (how did the threat actor get credentials?)
 2. Privilege escalation path (how did they get destructive permissions?)
 3. Full scope of destructive actions (what was encrypted/deleted?)
@@ -508,6 +512,7 @@ Use evidence collected in Part 2 to trace:
    > 📌 **This list is not exhaustive.** Threat actors employ many persistence techniques beyond those listed here. For a comprehensive reference of persistence mechanisms observed in AWS environments, see the [Threat Technique Catalog for AWS](https://aws-samples.github.io/threat-technique-catalog-for-aws/).
 
 2. **Rotate all credentials in affected accounts**
+
    ```bash
    # Generate new access keys for legitimate users (after deleting compromised ones)
    aws iam create-access-key --user-name legitimate-user
@@ -520,6 +525,7 @@ Use evidence collected in Part 2 to trace:
    - Confirm all legitimate KMS keys are still enabled and accessible
    - Verify key policies have not been modified to grant threat actor access
    - If threat actor scheduled key deletion, cancel it immediately:
+
    ```bash
    aws kms cancel-key-deletion --key-id arn:aws:kms:us-east-1:123456789012:key/KEY_ID
    aws kms enable-key --key-id arn:aws:kms:us-east-1:123456789012:key/KEY_ID
@@ -536,7 +542,7 @@ Use evidence collected in Part 2 to trace:
 
 > `[IR Lead]` provides technical assessment of backup integrity. Payment decisions are outside the scope of this playbook — consult your organization's Legal counsel and cyber insurance provider.
 
-```
+```text
 Can we recover from backups?
 │
 ├── YES — Backups confirmed intact (Vault Lock / Object Lock / cross-account copies)
@@ -802,6 +808,7 @@ For detailed Athena queries, GuardDuty CLI commands, and CloudTrail investigatio
 📁 [`resources/athena-queries-ransomware.sql`](resources/athena-queries-ransomware.sql)
 
 These queries cover:
+
 - KMS key creation and encryption operations by a suspected principal
 - Bulk deletion activity across S3, EBS, RDS, and AWS Backup (with anomaly detection)
 - Snapshot operations — deletion, cross-account sharing, copying
@@ -858,7 +865,7 @@ Ransomware incidents trigger notification obligations under most regulatory fram
 | **CISA Reporting (CIRCIA)** | Covered entity experiences substantial cyber incident | 72 hours (when final rule effective) | Ransomware payment: 24 hours |
 
 > ⚠️ The clock starts at **awareness**, not confirmation. When in doubt, assume notification is required and consult Legal immediately. For ransomware, the availability impact alone (inability to access data) is sufficient to trigger most frameworks — you do not need to prove exfiltration.
-
+>
 > ⚠️ **Ransom payments** have additional reporting requirements. CISA requires reporting within 24 hours. OFAC sanctions screening is mandatory before any payment. Consult Legal before any payment decision.
 
 ---
@@ -892,6 +899,7 @@ Ransomware incidents trigger notification obligations under most regulatory fram
 When GuardDuty detects malware on an EC2 instance, automatically create EBS snapshots of all attached volumes to preserve the pre-encryption state.
 
 **EventBridge Rule Pattern:**
+
 ```json
 {
   "source": ["aws.guardduty"],
