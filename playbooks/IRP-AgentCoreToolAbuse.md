@@ -160,7 +160,7 @@ Save all evidence to the forensic S3 bucket with Object Lock in COMPLIANCE mode 
 
 - **Code Interpreter activity.** The data-plane event for code execution is `InvokeCodeInterpreter` (action and session live in `requestParameters`); lifecycle events are `StartCodeInterpreterSession` / `StopCodeInterpreterSession`. An invocation spike from one principal, sessions that outlast their normal duration, or invocations from never-before-seen IPs all indicate the sandbox is being used for reconnaissance or exfiltration rather than legitimate reasoning.
 - **Browser activity and streaming connections.** Browser interaction spans three data-plane actions. `ConnectBrowserAutomationStream` establishes the Chrome DevTools Protocol (CDP) automation stream — page navigation runs over this stream, with the target URL passed inside the call rather than as a separate event name. `InvokeBrowser` is a **separate, standalone action** that performs OS-level browser actions (mouse clicks, keyboard input, screenshots, and dialogs that CDP cannot reach, such as print and JavaScript-alert dialogs) against an active session identified by `browserIdentifier` + `sessionId` — do not assume browser activity is visible only through the automation stream. `ConnectBrowserLiveViewStream` is the live-view stream. All three can establish or drive sessions that outlive the client's view. `SaveBrowserSessionProfile` captures cookies, localStorage, and sessionStorage into a Browser Profile (also creatable via the control-plane `CreateBrowserProfile`) that persists across sessions — saving a profile after authenticating to an external service establishes authenticated-session persistence that survives the session's termination.
-- **Persistent WebSocket / AGUI streams.** `InvokeAgentRuntimeWithWebSocketStream` establishes bidirectional WebSocket connections (the User-Id header variant — `X-Amzn-Bedrock-AgentCore-Runtime-User-Id` — maps to the same IAM action, not a separate `…ForUser` action) that persist after an SCP or IAM block until the underlying TCP connection closes — API-level denial does **not** immediately terminate the stream.
+- **Persistent WebSocket / AGUI streams.** `InvokeAgentRuntimeWithWebSocketStream` establishes bidirectional WebSocket connections that persist after an SCP or IAM block until the underlying TCP connection closes — API-level denial does **not** immediately terminate the stream. When a call carries the `X-Amzn-Bedrock-AgentCore-Runtime-User-Id` header, AgentCore requires **both** `bedrock-agentcore:InvokeAgentRuntime` **and** the separate `bedrock-agentcore:InvokeAgentRuntimeForUser` action — a deny that omits `InvokeAgentRuntimeForUser` leaves the on-behalf-of-user invocation path open, so any deny set must include it.
 - **Network-mode drift.** Code Interpreter supports three network modes: PUBLIC (unrestricted outbound), SANDBOX (S3 and DNS only), and VPC (customer-controlled). The mode is **immutable** once created — there is no `UpdateCodeInterpreter` or `UpdateBrowser` API — so an attacker downgrading SANDBOX/VPC to PUBLIC must `Delete` then `Create`. A `DeleteCodeInterpreter` followed by a `CreateCodeInterpreter` whose `networkConfiguration.networkMode` differs from the IaC baseline (apply the same pattern to `DeleteBrowser`/`CreateBrowser`) must be investigated before containment.
 - **VPC egress (VPC-mode only).** Enumerate the relevant ENIs (`aws ec2 describe-network-interfaces --filters Name=description,Values="*bedrock-agentcore*"`), then query Flow Logs for ACCEPT entries to non-RFC1918 destinations. **PUBLIC-mode and SANDBOX-mode resources produce no flow-log visibility at all** — for those modes detection relies on Route 53 Resolver DNS query logs and application-layer logs only.
 - **DNS exfiltration.** Query Route 53 Resolver DNS logs for queries to non-AWS domains. SANDBOX mode permits DNS resolution (so agents can reach S3 via DNS), which makes DNS a working exfiltration channel. A cluster of queries to a newly-registered domain, a dynamic-DNS provider, or a domain matching no allowlisted service is evidence of DNS-encoded exfiltration.
@@ -255,6 +255,8 @@ Is containment action required immediately?
    aws bedrock-agentcore-control delete-browser-profile --profile-id <pid>
    ```
 
+   > **IAM prerequisite:** `delete-browser-profile` requires `bedrock-agentcore:DeleteBrowserProfile`, which a read-only investigator role will not have. Confirm the IR/containment role carries it (and `bedrock-agentcore:ListBrowserProfiles`) before you reach this step, or the deletion fails with `AccessDenied` mid-incident.
+
 3. **Block new sandbox-session API calls (if abuse continues or scope is unclear)**
    Apply an SCP that denies every new sandbox-session API call across the account except for the incident-responder role. This prevents the attacker from starting new sandbox sessions while you investigate.
 
@@ -264,6 +266,8 @@ Is containment action required immediately?
      "Action": [
        "bedrock-agentcore:StartCodeInterpreterSession",
        "bedrock-agentcore:StartBrowserSession",
+       "bedrock-agentcore:InvokeAgentRuntime",
+       "bedrock-agentcore:InvokeAgentRuntimeForUser",
        "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream",
        "bedrock-agentcore:ConnectBrowserAutomationStream",
        "bedrock-agentcore:ConnectBrowserLiveViewStream",
@@ -486,6 +490,8 @@ Review and update this playbook based on what you learned. Do not wait for the n
 ---
 
 ## Appendix A — Useful Queries
+
+> **Locate your CloudTrail log group first.** The CloudWatch Logs Insights queries below run against the CloudTrail trail's log group, whose name is environment-specific (not a fixed `/aws/cloudtrail`). Resolve it before running them: `aws cloudtrail describe-trails --query 'trailList[?CloudWatchLogsLogGroupArn].CloudWatchLogsLogGroupArn' --output text` and use the log-group portion of that ARN as the `--log-group-name`.
 
 ### Code Interpreter session activity (CloudWatch Logs Insights, CloudTrail log group)
 

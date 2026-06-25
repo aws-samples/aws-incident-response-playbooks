@@ -148,7 +148,7 @@ Collect and preserve the following **before taking any containment actions**. Ev
 | GuardDuty / Security Hub finding JSON | Console → Export | Forensic S3 bucket |
 | Workload-identity / credential-provider config snapshots | `aws bedrock-agentcore-control get-workload-identity` / `get-oauth2-credential-provider` / `get-api-key-credential-provider` | Forensic S3 bucket |
 | Token Vault CMK configuration | `aws bedrock-agentcore-control get-token-vault --token-vault-id default` | Forensic S3 bucket |
-| IAM credential last-used data | `aws iam get-credential-report` | IR ticket / notes |
+| IAM credential last-used data | `aws iam generate-credential-report` first (run once; wait ~5s for `COMPLETE`), then `aws iam get-credential-report` — calling `get` before a report exists returns `ReportNotPresent` | IR ticket / notes |
 | External OAuth provider audit logs | Provider admin portal / API (see Appendix A table) | Forensic S3 bucket |
 
 **Investigation and scoping steps for this scenario:**
@@ -260,6 +260,9 @@ Is containment action required immediately?
    ```bash
    aws cognito-idp admin-disable-user --user-pool-id <USER_POOL_ID> --username <user>
    aws cognito-idp admin-user-global-sign-out --user-pool-id <USER_POOL_ID> --username <user>
+   # Verify containment landed (expect Enabled=false):
+   aws cognito-idp admin-get-user --user-pool-id <USER_POOL_ID> --username <user> \
+     --query '{Username:Username,Enabled:Enabled,Status:UserStatus}' --output table
    ```
 
    If Part 2 step 4 surfaced a `CreateUserPoolClient`/`UpdateUserPoolClient` or an injected **pre/post-authentication Lambda trigger** during the window, detach the trigger now — disabling the user and global sign-out do **not** stop a malicious trigger from minting tokens or exfiltrating auth events on subsequent logins by other users. Snapshot the current `LambdaConfig` to the forensic bucket first (it is evidence), then clear the suspect trigger(s); full removal/forensics of the Lambda itself happens in eradication (§4.2).
@@ -279,6 +282,8 @@ Is containment action required immediately?
 
 4. **Delete every rogue workload identity created by the suspect principal.**
    Workload identities vend scoped credentials to agents and MCP servers, so an attacker-created workload identity is an ongoing credential-minting path that must be removed even after the parent credential is revoked. The delete parameter is `--name`, not `--workload-identity-id`.
+
+   > **Paginate.** The `list-*` commands in this step (and `list-user-pool-clients` above) cap each page at `--max-results`; an account with more resources than the page size returns a `nextToken` you must follow, or you will miss attacker-created identities. Loop until the token is empty, e.g.: `T=""; while :; do OUT=$(aws bedrock-agentcore-control list-workload-identities --max-results 20 ${T:+--next-token "$T"}); echo "$OUT" | jq -r '.workloadIdentities[].name'; T=$(echo "$OUT" | jq -r '.nextToken // empty'); [ -z "$T" ] && break; done`
 
    ```bash
    aws bedrock-agentcore-control list-workload-identities --max-results 20

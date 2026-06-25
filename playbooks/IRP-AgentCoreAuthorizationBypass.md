@@ -263,7 +263,7 @@ A Gateway in `LOG_ONLY` is an active-threat condition by definition — authoriz
 **Step-by-step containment for this incident type:**
 
 1. **Force every Gateway back to `ENFORCE` mode.**
-   This is the single most urgent action — it re-enables authorization on every affected Gateway. Because `UpdateGateway` is a PUT, you must fetch the current configuration first and pass back every required field with only the mode changed to `ENFORCE`. Omit optional fields (`--authorizer-configuration`, `--protocol-configuration`) entirely when the source config does not have them — do not pass literal `null`.
+   This is the single most urgent action — it re-enables authorization on every affected Gateway. Because `UpdateGateway` is a PUT, you must fetch the current configuration first and pass back every required field with only the mode changed to `ENFORCE`. **Re-pass any field the Gateway already has set — especially `--kms-key-arn`.** If the Gateway is encrypted with a customer-managed key and you omit `--kms-key-arn`, `UpdateGateway` fails with `ValidationException: KMS key cannot be updated for an existing gateway` (the API reads the omission as an attempt to change the key). Omit only fields the source config genuinely does not have — do not pass literal `null`.
 
    ```bash
    for GW in $(aws bedrock-agentcore-control list-gateways --query "items[].gatewayId" --output text); do
@@ -278,6 +278,10 @@ A Gateway in `LOG_ONLY` is an active-threat condition by definition — authoriz
        --authorizer-type "$(echo "$CONFIG" | jq -r '.authorizerType')"
        --policy-engine-configuration "{\"mode\":\"ENFORCE\",\"arn\":\"$PE_ARN\"}"
      )
+     # Preserve the existing CMK — omitting it on a KMS-encrypted gateway is rejected.
+     if [ "$(echo "$CONFIG" | jq -r '.kmsKeyArn')" != "null" ]; then
+       ARGS+=(--kms-key-arn "$(echo "$CONFIG" | jq -r '.kmsKeyArn')")
+     fi
      if [ "$(echo "$CONFIG" | jq -r '.authorizerConfiguration')" != "null" ]; then
        ARGS+=(--authorizer-configuration "$(echo "$CONFIG" | jq -c '.authorizerConfiguration')")
      fi
