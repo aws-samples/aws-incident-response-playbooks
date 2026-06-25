@@ -1,244 +1,1005 @@
-# Incident Response Playbook Template
+# IRP-PersonalDataBreach: Personal Data Breach Response
 
-### Incident Type
+> **Playbook Version:** 2.1
+> **Last Reviewed:** 2026-06-18
+> **Status:** `Active`
+> **NIST Framework:** SP 800-61r3 (CSF 2.0 Community Profile)
+> **Related Playbooks:** [IRP-DataAccess](IRP-DataAccess.md) | [IRP-CredCompromise](IRP-CredCompromise.md) | [IRP-InsiderThreat](IRP-InsiderThreat.md) (Coming Soon) | [IRP-Ransomware](IRP-Ransomware.md)
 
-Personal Data Breach
+---
 
-### Introduction
+> ⚠️ **Disclaimer:** This playbook is provided as a template only. It should be customized to suit your organization's specific needs, risks, available tools, and work processes. This guide is not official AWS documentation and is provided as-is. Security and Compliance is a shared responsibility between you and AWS. You are responsible for making your own independent assessment of the information in this document.
 
-This playbook is provided as a template to customers using AWS products and who are building their incident response capability. You should customize this template to suit your particular needs, risks, available tools and work processes.
+---
 
-Security and Compliance is a shared responsibility between you and AWS. AWS is responsible for “Security of the Cloud”, while you are responsible for “Security in the Cloud”. For more information on the shared responsibility model, [please review our documentation](https://aws.amazon.com/compliance/shared-responsibility-model/).
+## Overview
 
-You are responsible for making your own independent assessment of the information in this document. This document: (a) is for informational purposes only, (b) references current AWS product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. This document is provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. The responsibilities and liabilities of AWS to its customers are controlled by AWS agreements, and this document is not part of, nor does it modify, any agreement between AWS and its customers.
+A personal data breach occurs when personal, regulated, or sensitive data is confirmed to have been accessed, disclosed, altered, or destroyed without authorization. This playbook is activated when an incident — potentially already being handled technically by another playbook — is confirmed to involve personal or regulated data. The focus here is on **regulatory obligation assessment, notification timeline management, evidence preservation for regulators, and individual notification coordination**. Technical containment may already be underway via IRP-CredCompromise, IRP-DataAccess, or IRP-InsiderThreat; this playbook runs in parallel to manage the legal, privacy, and communications workstream that a personal data breach triggers.
 
-## Summary
+### Out of Scope
 
-### This Playbook
+This playbook does **not** cover:
 
-This playbook outlines response steps for Personal Data Breach incidents.  These steps are based on the [NIST Computer Security Incident Handling Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r2.pdf) (Special Publication 800-61 Revision 2) that can be used to:
+- **Unauthorized data access without personal data involvement** — If the accessed data is purely operational (infrastructure configs, non-personal telemetry), see [IRP-DataAccess](IRP-DataAccess.md) for technical response only.
+- **Credential compromise as the initial vector** — If you are still investigating the initial access method, see [IRP-CredCompromise](IRP-CredCompromise.md). Return here once personal data involvement is confirmed.
+- **Insider threat investigation and HR coordination** — If the breach was caused by an authorized insider acting outside their role, see [IRP-InsiderThreat](IRP-InsiderThreat.md) (Coming Soon) for the personnel and investigation aspects. This playbook still applies for the notification obligations.
+- **Ransomware with data unavailability** — If personal data has been encrypted (availability breach under GDPR), pivot to [IRP-Ransomware](IRP-Ransomware.md) for technical recovery while continuing notification assessment here.
 
-* Gather evidence
-* Contain and then eradicate the incident
-* Recover from the incident
-* Conduct post-incident activities, including post-mortem and feedback processes
+### Applicable Finding Types
 
-Interested readers may also refer to the [AWS Security Incident Response Guide](https://docs.aws.amazon.com/whitepapers/latest/aws-security-incident-response-guide/welcome.html) which contains additional resources.
+| Source | Finding / Event Type | Severity |
+|---|---|---|
+| Amazon Macie | `SensitiveData:S3Object/Personal` | HIGH |
+| Amazon Macie | `SensitiveData:S3Object/Financial` | HIGH |
+| Amazon Macie | `SensitiveData:S3Object/Credentials` | CRITICAL |
+| Amazon Macie | `Policy:IAMUser/S3BucketPublic` (on buckets with PII) | CRITICAL |
+| Amazon GuardDuty | `Exfiltration:S3/MaliciousIPCaller` | HIGH |
+| Amazon GuardDuty | `Exfiltration:S3/AnomalousBehavior` | HIGH |
+| Amazon GuardDuty | `UnauthorizedAccess:S3/TorIPCaller` | HIGH |
+| Amazon GuardDuty | `Discovery:S3/AnomalousBehavior` | MEDIUM |
+| AWS Security Hub | S3 bucket findings on data stores containing personal data | HIGH |
+| CloudTrail | `eventName: GetObject` (bulk access to PII-classified buckets) | — |
+| CloudTrail | `eventName: CopyObject` (cross-account copy of personal data) | — |
+| CloudTrail | `eventName: SelectObjectContent` (S3 Select on PII buckets) | — |
+| Third-Party DLP | Data loss prevention alerts indicating PII in transit | HIGH |
+| External Report | Customer/individual report of data misuse or exposure | — |
 
-Once you have customized this playbook to meet your needs, it is important that you test the playbook (e.g., Game Days) and any automation (functional tests), update as necessary to achieve the desired results, and then publish to your knowledge management system and train all responders.
+> 📌 Amazon Macie sensitive data discovery jobs and automated discovery provide the primary signal for personal data classification. See the [Macie finding types reference](https://docs.aws.amazon.com/macie/latest/user/findings-types.html) for the current list.
 
-Note that some of the incident response steps noted in each scenario may incur costs in your AWS account(s) for services used in either preparing for, or responding to incidents. Customizing these scenarios and testing them will help you to determine if additional costs will be incurred. You can use [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) and look at costs incurred over a particular time frame (such as when running Game Days) to establish what the possible impact might be.
+> 📌 GuardDuty finding types are updated regularly. See the [GuardDuty finding types reference](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html) for the current list.
 
-* * *
+### Severity Classification
 
->  **Warning**
->
-> Besides the procedures outlined in this playbook, your jurisdiction may have requirements and/or legislation about privacy laws (e.g. General Data Protection Regulation (GDPR), California Consumer Privacy Act (CCPA) etc). It may require you to report a security breach and the suspected or confirmed loss or theft of any material or records data. We recommend establishing if this applies to your organization before operationalising this playbook. 
+| Priority | Criteria |
+|---|---|
+| **P1 — Critical** | Confirmed exfiltration of personal data outside the AWS environment, large-scale breach, or data types with high harm potential (health, financial, biometric, children's data) |
+| **P2 — High** | Confirmed unauthorized access to personal data, data may have left the environment, or regulatory notification deadline is imminent (<24 hours remaining on 72-hour clock) |
+| **P3 — Medium** | Personal data exposure suspected but not confirmed (e.g., bucket was public but access logs show no external downloads), or low-sensitivity data with limited individual count |
+| **P4 — Low** | Policy violation involving personal data stores with no evidence of unauthorized access (e.g., encryption disabled briefly, access logging gap) |
 
-* * *
+---
 
-In reviewing this playbook, you will find steps that involve processes that you may not have in place today. Proactively preparing for incidents means you need the right resource configurations, tools and services in place that allow you to respond to an incident.
+## Part 1 — Prepare
 
-The next section will provide a summary of this incident type, and then cover the five steps (parts 1 - 5) for handling credential compromise.
+> **CSF 2.0 Functions:** Govern · Identify · Protect
+> **Goal:** Ensure the right configurations, access, and processes are in place *before* this incident type occurs.
 
-### This Incident Type
+### 1.1 Recommended AWS Service Configurations
 
-A data breach occurs where there is an unauthorised access to or disclosure of personal information, or information is lost in circumstances where unauthorised access or disclosure is likely that could result in harm or inconvenience, such as fraud or identity theft, to an individual.
+The following services each contribute to your ability to detect, scope, and document a personal data breach for regulatory purposes. None are strictly required, but each addresses a specific gap — the more you have enabled, the faster you can determine breach scope and the more defensible your notification decisions will be.
 
-**What is personal data?**
+- [ ] **Amazon Macie** enabled with automated sensitive data discovery running across all S3 buckets — provides continuous identification of where personal data resides and what categories it contains
+- [ ] **Macie custom data identifiers** configured for organization-specific PII patterns (employee IDs, customer numbers, etc.) — extends Macie's detection to organization-specific personal data formats
+- [ ] **Amazon GuardDuty** enabled with S3 protection in all regions — detects exfiltration patterns and unauthorized access to data stores
+- [ ] **AWS CloudTrail** enabled with S3 data events on all buckets containing personal data — the primary evidence source for determining what personal data was accessed and by whom
+- [ ] **CloudTrail management events** enabled with multi-region trail and integrity validation — captures configuration changes to data stores
+- [ ] **AWS Config** enabled with S3-related rules (`s3-bucket-public-read-prohibited`, `s3-bucket-server-side-encryption-enabled`, `s3-bucket-logging-enabled`) — detects misconfigurations that could expose personal data
+- [ ] **Security Hub** enabled with findings aggregation from Macie and GuardDuty — provides unified view of personal data exposure risks
+- [ ] **S3 access logging** enabled on all buckets classified as containing personal data — provides granular access records for scope determination
+- [ ] **S3 Object Lock or versioning** enabled on buckets containing personal data (prevents silent deletion) — protects evidence from tampering
+- [ ] **Amazon Detective** enabled for graph-based investigation of access patterns — reduces time to determine breach scope
+- [ ] **AWS Artifact** access confirmed for compliance documentation retrieval — regulators may request proof of infrastructure security controls
+- [ ] **Data classification tags** applied to all data stores (e.g., `DataClassification: PII`, `DataClassification: PHI`, `DataClassification: PCI`) — enables rapid identification of affected data categories during an incident
 
-All information that can identify an individual is personal data, directly or indirectly. One example is a person’s name, but also things such as login-ID, birthdate, address, email-address, phone number, social-security number, etc. The concept of personal data goes even further: behavioral or performance data of an individual person (like geo-location, performance-metrics, working hours, device IDs, etc.) are all personal data. The rule of thumb is that if you’re thinking about whether some element could be personal data–it usually is! You should verify whether your systems handle or store personal data. If you have internal teams that can help you with this (legal, policy) check with them. If you do not, you can create and document your own definition based on existing definitions today, such as [Article 4 of the GDPR](https://gdpr.eu/article-4-definitions/), or the [definition used in various NIST](https://csrc.nist.gov/glossary/term/PII) Special Publications. Commonly, the personal data referred to in this playbook is known as Personally Identifiable Information (PII).
+> 🤖 **Automation opportunity:** Use Macie automated sensitive data discovery with classification jobs to maintain a continuously updated inventory of where personal data resides. Combine with AWS Config rules to alert when untagged buckets contain Macie-identified PII.
 
-[Art. 4 (1) of GDPR](https://gdpr.eu/article-4-definitions/) defines personal data as:
+> 📌 **Don't have Macie enabled?** Macie can be enabled *during* an incident — it doesn't require historical data to be useful. Enable it on the affected bucket(s) and run an on-demand classification job. Initial results are typically available within 1–4 hours, well within the 72-hour GDPR notification window. If Macie is not available, see [Section 2.2 — Alternative classification approaches](#without-macie-alternative-classification-approaches) for manual methods.
 
-(1) ‘personal data’ means any information relating to an identified or identifiable natural person (‘data subject’); an identifiable natural person is one who can be identified, directly or indirectly, in particular by reference to an identifier such as a name, an identification number, location data, an online identifier or to one or more factors specific to the physical, physiological, genetic, mental, economic, cultural or social identity of that natural person.
+> 📖 **Reference:** [SEC10-BP06 Pre-deploy tools](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_deploy_tools.html) — AWS Well-Architected Framework recommends pre-deploying investigation and response tooling so capabilities are available immediately when needed.
 
-## Incident Response Process
+### 1.2 IAM & Access Prerequisites
 
-### Part 1: Acquire, Preserve, Document Evidence
+Effective incident response for personal data breaches requires having the right access available *before* an incident occurs. Privacy-specific response actions (Macie queries, S3 legal holds, data event exports) use different permissions than typical security response. Pre-provisioning these ensures the Privacy Officer's technical liaison can immediately scope the breach without waiting for access approvals. This aligns with [SEC10-BP05 Pre-provision access](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_pre_provision_access.html) from the AWS Well-Architected Framework.
 
->**Note**
->
-> It is important to exercise caution when collecting information during a PII data breach, as personal information must not be recorded. Instead, focus on collecting contextual information surrounding the breach to aid in the investigation.
+- [ ] **Break-glass IAM role** exists with permissions to: query Macie findings, read S3 access logs, query CloudTrail data events, export GuardDuty findings, and apply S3 Object Lock — pre-tested and documented
+- [ ] **IR team members can assume the break-glass role** with MFA from a trusted account — validate this works at least quarterly
+- [ ] **Access to AWS Security Incident Response console** confirmed (if subscribed)
+- [ ] **Forensic account** available with S3 buckets configured for legal hold (Object Lock in Governance or Compliance mode)
+- [ ] **Pre-approved S3 bucket policy** for emergency access restriction (deny all except IR role) is documented and tested
+- [ ] **Macie classification export permissions** confirmed (IR team can retrieve finding details)
+- [ ] **Privacy Officer has AWS console access** or a designated liaison who can retrieve Macie findings on their behalf
 
-1. You become aware that there has been a possible unintended personal data breach. This information could come via different means, for example:
-    1. PII was accidentally logged or found in the reporting systems, such as application log files, of your security operations.
-    2. An internal ticketing system (the sources of the ticket are varied and could include any of the means below)
-    3. A message from a contractor or third-party service provider
-    4. From an alert in one of your own monitoring systems, either internal or external, to AWS. For example, in AWS, this might include an AWS Config managed rule, AWS CloudTrail via Amazon EventBridge or Amazon CloudWatch Events and Amazon Simple Notification Service (Amazon SNS), via Amazon Macie, Amazon GuardDuty, AWS Security Hub or a similar service.
-    5. From an alert in one of your data loss prevention (DLP) systems
-    6. From a threat actor (for example, requesting a ransom or they will disclose data)
-    7. From a security researcher
-    8. Via an anonymous tip
-    9. From a public news article in the press, on a blog, or in the news
-
-2. Confirm a ticket/case has been raised for the incident. If not, manually raise one.
+### 1.3 Communication & Escalation
 
-3. Determine the sensitivity of the impacted data and record specific AWS resources that were the origin of the breach. It is also essential to determine the number of individuals who were affected by the incident with certainty (*Contextual information is often a key factors in determining the severity of an incident within an Organization*):
-    1. *Nature of personal data:* Your organization's [data classification](https://docs.aws.amazon.com/whitepapers/latest/data-classification/data-classification.html) standards should also define how to handle a Personal Identifiable Information (PII) data breach. The steps or actions you take may vary depending on the sensitivity/classification of the data involved in the breach, you will refer to your data classification and handling policies to determine this. These standards determine the necessary level of protection for different types of information based on their sensitivity. For example, the level of seriousness for a data breach involving sensitive personal health information of an individual would be greater than that of a breach involving publicly available data:
-        1. According to your jurisdiction legal requirements and data classification specifications, it may be necessary to categorize breached data as Personally Identifiable Information (PII) and Publicly Available Information (PAI). Here are few examples:
-            - You should consider the breached personal data as PII unless proven otherwise.
-            - A common example of PAI is information that is readily accessible to the public, such as a person's name, address, and phone number which is listed in a public directory or on social media platforms.
-    2. *Number of AWS resources involved:* Below are a few potential scenarios:
-        1. An Amazon S3 bucket or an Amazon RDS database was compromised, containing sensitive information such as social security numbers, credit card numbers, banking information, or medical records.
-        2. An Amazon Elasticsearch index was lost or compromised, containing personally identifiable information (PII) that should not be publicly accessible.
-        3. An Amazon S3 bucket containing personally identifiable information (PII) was compromised and is publicly available. Here are two example scenarios:
-            -  The bucket was made publicly accessible when it should not have been.
-            -  The bucket may not have been publicly accessible, but data was still exfiltrated due to credential leakage or an incorrectly configured system that accessed the data and made it publicly available.
-    3.  *Number of individual affected:* This information may help your organization to assess the impact on affected individuals and take appropriate measures to mitigate the consequences, such as offering identity theft protection services or providing timely notifications to prevent further harm.
+Personal data breach escalation is time-critical due to hard regulatory deadlines. Unlike purely technical incidents where containment can proceed before leadership is informed, personal data breaches start a notification clock at the moment of awareness. This means the escalation path must be fast, pre-tested, and well understood by all parties. Everyone in this table should know their role *before* an incident occurs.
 
-4. The collection of evidence (AWS CloudTrail logs, AWS Config rules finding etc.) in relation to AWS data services must adhere to a strict chain of custody to ensure the integrity and authenticity of the data as per your jurisdiction legal requirements. Evidence and artifacts can consist of, but aren’t limited to:
-    1. All EC2 instance metadata
-    2. Amazon EBS disk snapshots
-    3. EBS disks streamed to S3
-    4. Memory dumps
-    5. Memory captured through hibernation on the root EBS volume
-    6. CloudTrail logs
-    7. AWS Config rule findings
-    8. Amazon Route 53 DNS resolver query logs
-    9. VPC Flow Logs
-    10. AWS Security Hub findings
-    11. Elastic Load Balancing access logs
-    12. AWS WAF logs
-    13. Custom application logs
-    14. System logs
-    15. Security logs
-    16. Any third-party logs
-
-5. At this point, you may not know the cause of data breach:
-    1. Extrusion by attackers —an attackers penetrated the security perimeter and,gain access to sensitive personal data.
-    2. Insider threats — a malicious insider, or an attacker who has compromised a privileged user accounts, abuses their permissions and attempts to move data outside the organization.
-    3. Unintentional or negligent data exposure — an employees who lose sensitive data in public, provide open Internet access to data, or fail to restrict access per organizational policies.
-
-6. If you are already aware of AWS resources involved (like Amazon S3 or Amazon RDS etc) and , Firstly move to **Part 2** to contain the incident. Once that is done, return here and then move on to step 5. If you have not established which bucket(s) are involved, continue to step 4.
-
-7. If you are *not aware* of the AWS resources involved incident personal data breach within an AWS account, follow these steps:
-    1. Check AWS services used for data storage and processing, such as Amazon S3, Amazon RDS, Amazon DynamoDB, etc.
-    2. Employ the use of internal tools to associate the data with a specific storage location, such as by checking a Configuration Management Database (CMDB).
-    3. Review AWS CloudTrail logs for suspicious activity or unauthorized access.
-    4. Examine the findings of Amazon GuardDuty in either the source AWS account or the central security monitoring account, focusing specifically on any recent findings, regardless of whether AWS resources are implicated in the incident.
-    5. Additionally, review AWS CloudTrail logs to detect any unauthorized access or changes to parameters/secrets in AWS Systems Manager Parameter Store and AWS Secrets Manager. This is important as these services may act as the starting point for managing credentials to access data storage services. To get you started, few examples are:
-        1. [Analyze Security, Compliance, and Operational Activity Using AWS CloudTrail and Amazon Athena](https://aws.amazon.com/blogs/big-data/aws-cloudtrail-and-amazon-athena-dive-deep-to-analyze-security-compliance-and-operational-activity/)
-    6. Please review the access logs for your S3 buckets to identify any unintended or unidentified activity. Here are a few examples of documentation to help you get started:
-        1. [Logging requests using server access logging](https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html)
-        2. [Identifying access to S3 objects by using CloudTrail](https://docs.aws.amazon.com/AmazonS3/latest/userguide/cloudtrail-request-identification.html#cloudtrail-identification-object-access)
-    7. Utilize the *Advanced Queries* feature of AWS Config to analyze any unintentional or unidentified changes to AWS resources and configurations. To get you started, few example queries mentioned [here.](https://docs.aws.amazon.com/config/latest/developerguide/example-query.html)
-    8. Examine Amazon VPC Flow Logs and AWS WAF logs for any anomalous network activity.
-
-8. If you are *aware* of the AWS resources involved:
-    1. Consider the following steps to identify suspicious activity or unauthorized access in Amazon S3:
-        1. [Review Amazon Macie policy findings related to your S3 data](https://docs.aws.amazon.com/macie/latest/user/findings-types.html#findings-policy-types)
-        2. [Analyze S3 protection in Amazon GuardDuty](https://docs.aws.amazon.com/guardduty/latest/ug/s3-protection.html) 
-    2. For unintended access to an Amazon S3 bucket refer to [this incident response playbook.](https://github.com/aws-samples/aws-incident-response-playbooks/blob/master/playbooks/IRP-DataAccess.md)
-
-9. As previously stated, you maintaining a clear chain of custody is crucial in ensuring the immutability of all evidence. Some of the techniques are mentioned in blog post - [Forensic investigation environment strategies in the AWS Cloud](https://aws.amazon.com/blogs/security/forensic-investigation-environment-strategies-in-the-aws-cloud/). In summary, here are the techniques:
-    1. Snapshots of Amazon EBS disks: The original EBS disks can be snapshotted, shared to a forensics account, converted into a volume, and mounted in read-only mode for offline analysis.
-    2. Manually captured Amazon EBS volumes: Linux tools such as dc3dd can be used to stream the volume to an S3 bucket, along with a hash, and made immutable using an S3 method.
-    3. Artifacts stored in an S3 bucket, such as memory dumps: Object Lock in S3 can prevent deletion or overwriting of objects for a specified duration or permanently. MFA delete requires multi-factor authentication to delete an object permanently. Glacier provides a Vault Lock feature to retain evidence in an immutable state over the long term.
-    4. Disk volumes: Read-only mode can be used for Linux and write-blocker applications for Windows, some of which are specifically designed for forensic use.
-    5. CloudTrail logs: Log file integrity can be validated using CloudTrail's SHA-256 hash and SHA-256 with RSA signing. S3 Object Lock - Governance Mode can be used for protection.
-    6. AWS Systems Manager inventory: By default, metadata on managed instances is stored in an S3 bucket and can be secured using the above methods.
-    7. AWS Config data: Data stored by AWS Config in an S3 bucket can also be protected through the aforementioned methods.
-
-10. Check if there are any open support tickets for the data storage service, and search for connections with any alerts or information related to the incident. Note any perceived effects on end-users, which may encompass but are not limited to:
-    1. Missing data from the storage service
-    2. Unexpected presence of new data in the storage service
-    3. Changes in access settings (such as permissions) of data, especially if they have been made public
-    4. Modified data storage service permissions, access controls, or settings that prevent public access (these may be less noticeable to regular users, but still a possibility)
-
-11. The following are recommendations for internal and external communication regarding a data breach incident, however they may vary based on legal requirements. This example is based on an organization governed by GDPR regulations.
-    1. For internal communication, it is important to quickly gather relevant information and assess the scope and impact of the breach. This information should then be shared with the incident response team and relevant stakeholders within the organization. Regular updates should be provided throughout the investigation process to keep everyone informed.
-    2. For external communication, it is important to consider the privacy rights of individuals whose PII may have been compromised, as well as the organization's obligations under the GDPR or other relevant legislation/protocols for your jurisdiction. In general, organizations are required to report data breaches to relevant authorities within 72 hours and to notify affected individuals without undue delay. 
-
-### Part 2: Contain the Incident
-
-Early identification of unusual actions taken by users or strange network activity is crucial in minimizing the harm caused by incidents involving a PII data breach. To prevent the situation from worsening, it's important to take steps to contain the incident, as well as collaborating with your organization's legal and compliance team on any necessary responses and following the incident response plan outlined. Here are a few examples of containment actions for specific AWS services:
-
-1. In this scenario, PII data breach was in an Amazon S3 bucket. Here are the steps you can take to contain the incident:
-    1. Identify IAM identities with access to AWS resources
-        1. The first step in the process is to identify the IAM identities (which can be either human users or non-human roles) that have access to the AWS resources in question. This is important because it helps to determine the scope of the breach and the extent to which sensitive data has been compromised. Based on this information, you can then take appropriate actions to mitigate the impact of the breach.
-    2. Remove access granting policy for the specific IAM role or user
-        1. In order to revoke S3 access from an IAM role or user, you need to navigate to the specific S3 bucket where the data breach has occurred. This is where the sensitive data was stored and where unauthorized access occurred.
-        2. Once you have navigated to the specific S3 bucket, you need to click on the "Permissions" tab. From there, select the "Bucket Policy" option.
-        3. The next step is to remove the access granting policy for the specific IAM role or user.  Here is a example policy on how to [Managing user access to specific folders.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/example-bucket-policies.html#example-bucket-policies-folders)This will effectively revoke the access of the IAM role or user to the S3 bucket, preventing further unauthorized access to the sensitive data
-
-2. In this scenario, external vendor accounts have been accessing PII stored in DynamoDB tables through SQS and AWS Lambda. The PII data is encrypted using a KMS key at rest and in transit by application, however, due to a defect in the application, some of the PII information may not have been encrypted properly in transit. To contain this PII data breach, you can take the following actions: 
-    1. Please evaluate the potential business impact of limiting or revoking vendor access to the DynamoDB table, if applicable.
-    2. If it is acceptable to revoke the access of the vendor, you can do so by updating the access policy to remove their permissions to access the impacted DynamoDB tables and the corresponding SQS queue. This will help to prevent any unauthorized access or use of the resources, which will limit the potential impact of the security breach.
-    3. Remove the PII data from the logs of the Lambda function that consumes SQS messages. This helps prevent the sensitive information from being further disclosed or compromised. By using Amazon Comprehend and a Lambda function, you can automatically detect and redact PII data in your S3 objects. Following  is a tutorial on explaing how this can be accomplished:
-        1. [Tutorial: Detecting and redacting PII data with S3 Object Lambda and Amazon Comprehend](https://docs.aws.amazon.com/AmazonS3/latest/userguide/tutorial-s3-object-lambda-redact-pii.html)
-        2. [Sample project to demonstrate how to use AWS SDK for Amazon Comprehend to detect and redact PII data from logs generated by Java applications](https://github.com/aws-samples/comprehend-logging-redact)
-    4. Conduct a table scan to identify all the rows with unencrypted PII data and update/delete columns. 
-
-### Part 3: Eradicate the Incident
-
-First step is to determine the affected resources using log data, resources, and automated tooling and then assess each affected resource to determine the business impact of deletion or restoration. Below is an example of eradication steps that can be taken for a personal data exposure that happened due to wide open security group:
-
-1. Identify the potential immediate cause or causes for the PII exposure at hand:
-    1. Analyze the collected log data, resources, and tooling to determine the source of the exposure.
-    2. Identify if the cause, and then work back through the “5 whys” to get to the root cause https://aws.amazon.com/blogs/mt/why-you-should-develop-a-correction-of-error-coe/.
-
-2. It may be helpful to review the infrastructure deployment pipelines, such as those implemented with CloudFormation via AWS Code Pipeline or Terraform, and the data pipelines to determine which mechanism led to the misconfiguration or misclassification of data injection mechanisms. Are there enough checks and balances in the pipeline? If not, it may be necessary to address this issue.
-
-3. If there are any specific issues that have been identified, take steps to remove any resources or configurations that were identified as the immediate causes. For example:
-    1. If the cause is a misconfigured security group, adjust the security group rules to prevent unauthorized access.
-    2. If the cause is an unauthorized user, revoke their access to the affected resources.
-    3. If the cause is a vulnerability, apply patches or upgrades to fix it.
-    4. There may be other causes, take the appropriate action. 
-
-4. Clean up the environment:
-    1. Delete any PII data that may have been exposed.
-    2. If PII data must be kept, encrypt it to prevent unauthorized access.
-
-5. Restore normal operations:
-    1. Restore permissions and access for authorized users.
-    2. Reconnect systems or resources to the network.
-
-### Part 4: Recover from the Incident
-
-In addition to restoring the service to a stable and reliable state, it is crucial to inform and provide clear guidance to affected users. Here are the steps you can follow:
-
-1. Coordinate with PR and Legal teams:
-    1. Work with your organization's public relations and legal teams to determine the most appropriate approach for communicating with affected users.
-
-1. Update FAQ and Help Center pages:
-    1. Utilize your organization's FAQ and Help Center web pages to provide clear and concise information to affected users.
-    1. Ensure that the FAQ and Help Center web page are updated regularly with the latest information regarding the incident, including any measures that users can take to safeguard themselves. Here are some sample guidelines that you can provide to your affected external customers in case of identity theft via your application:
-        1. *Verify the breach*: Confirm that your personal information has been exposed in the data breach by checking our help centre website. 
-        2. *Secure your accounts*: Change passwords for any accounts that use the breached information, such as email and financial accounts, and enable two-factor authentication.
-        3. *Monitor your accounts*: Regularly monitor your accounts associated with the breached information for any unauthorized activities.
-        4. *Place a fraud alert*: Consider placing a fraud alert on your credit report to alert lenders and banks to check with you before opening new accounts.
-        5. *Consider credit monitoring:* Consider enrolling in a credit monitoring service to receive alerts about any changes or suspicious activity on your credit report.
-        6. *Report the breach*: Report the data breach to relevant government agencies if applicable. 
-        7. *Stay vigilant*: Be mindful of phishing scams and other attempts to steal your information, and take steps to protect your information going forward.
-
-1. Provide timely information:
-    1. Make sure that information is updated in a timely manner to keep affected users informed of the latest developments.
-    2. Ensure that the information provided is accurate and easy to understand.
-
-By taking these steps, you can help affected users to stay informed and feel confident that their information and interests are being protected during an incident.
-
-### Part 5: Post-Incident Activity
-
->**Note**
->
-> It is important to contact legal counsel **early** to determine if public and individual communication needs to be initiated. Legal counsel can provide guidance on the specific legal requirements and obligations associated with the notification of personal data breaches, including any applicable laws, regulations, and industry standards.
-
-Once you have removed the affected resources, it's recommended that you perform a security assessment of your AWS account. This assessment can be accomplished by utilizing AWS Config rules, open-source tools like Prowler and ScoutSuite, or other providers. Furthermore, we suggest conducting vulnerability scans on your publicly accessible resources to identify any lingering risks.
-
-In the aftermath of a personal data breach, it is critical to conduct a comprehensive post-incident review to identify areas for improvement and prevent similar incidents from happening in the future. The following post-incident activities can be performed in accordance with the correction of error (COE) concept that is discussed in the following links:
-
-[Why you should develop a correction of error (COE)](https://aws.amazon.com/blogs/mt/why-you-should-develop-a-correction-of-error-coe/)
-[Correction of Error (COE)](https://wa.aws.amazon.com/wat.concept.coe.en.html)
-
-1. Review the incident: Perform a thorough review of the incident, including the causes, severity, and impact. This information will be used to determine the effectiveness of the incident response plan and identify areas for improvement.
-
-2. Document lessons learned: Document lessons learned from the incident and use this information to update the incident response plan. This information should include details about the attack vector, the methods used by the attacker, and any other relevant information.
-
-3. Update the incident response plan: Based on the lessons learned, update the incident response plan to reflect any changes or improvements that should be made to the incident response process.
-
-4. Perform a root cause analysis: Conduct a root cause analysis to determine the underlying causes of the incident and to identify any additional areas for improvement.
-
-5. Update policies and procedures: Based on the results of the root cause analysis, update policies and procedures to ensure that the incident response plan is aligned with best practices and regulatory requirements.
-
-6. Implement corrective actions: Implement any necessary corrective actions to prevent similar incidents from happening in the future.
+> 📋 Do not include names. Use roles only. Maintain a separate, access-controlled contact list.
+
+| Role | Responsibility | When to Engage |
+|---|---|---|
+| IR Lead | Overall incident coordination, technical workstream | Immediately upon incident detection |
+| Privacy Officer / DPO | Regulatory obligation assessment, notification decisions, DPA liaison | Within 1 hour of personal data involvement confirmed |
+| Legal Counsel | Legal privilege, notification content review, regulatory strategy | When notification obligation is likely (P1/P2) or within 4 hours of awareness |
+| Account Owner | Business context, data inventory knowledge | When scope of affected data stores needs clarification |
+| Communications Lead | Individual notification drafting, media response (if required) | When notification decision is made (typically 12–24 hours into incident) |
+| Customer Support Lead | Individual inquiry handling post-notification | 24–48 hours before individual notifications are sent |
+| AWS CIRT | Engage via AWS Support case or Security Incident Response service (P1/P2, if available) | P1: Immediately. P2: Within 4 hours. P3/P4: As needed for evidence gathering. |
+
+**Escalation path:**
+
+1. **Personal data involvement confirmed** → IR Lead documents the exact timestamp (this starts the notification clock)
+2. **Within 1 hour:** Privacy Officer / DPO notified — this is a hard internal SLA, non-negotiable
+3. **Within 2 hours:** IR Lead + Privacy Officer jointly assess severity using the classification table above
+4. **P1/P2:** Legal Counsel engaged immediately; AWS CIRT engaged; Communications Lead placed on standby
+5. **P3/P4:** Privacy Officer assesses notification obligation; IR Lead manages technical response via parallel playbook
+6. **Within 24 hours:** Notification decision made and documented (notify or documented justification for non-notification)
+
+> ⚠️ **Critical:** The Privacy Officer / DPO must be notified within **1 hour** of personal data involvement being confirmed. The 72-hour GDPR notification clock starts at awareness — delays in internal escalation directly consume the notification window.
+
+> 📖 **Reference:** [SEC10-BP01 Identify key personnel and external resources](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_identify_personnel.html) — pre-identify all stakeholders (including legal, privacy, and communications) and establish clear escalation paths before an incident occurs.
+
+### 1.4 Game Day Guidance
+
+Personal data breach scenarios are uniquely challenging because they require coordination across technical, legal, privacy, and communications workstreams — often with hard regulatory deadlines. Testing this playbook validates not just technical capability but also the speed of internal escalation, the accuracy of your data inventory, and the readiness of notification templates. Include your Privacy Officer and Legal Counsel in exercises.
+
+Recommended testing cadence: **Semi-annually** (this is a P1-capable scenario with hard regulatory deadlines).
+
+Suggested tabletop scenario:
+> *"Amazon Macie has generated a finding showing that an S3 bucket containing 50,000 customer records (names, email addresses, dates of birth, and Canadian Social Insurance Numbers) was accessed by a cross-account IAM role belonging to a third-party analytics vendor. The access occurred 6 hours ago. CloudTrail shows 12,000 GetObject calls from this role in a 30-minute window. Your customers span the EU, Canada, Australia, and California. You have 66 hours remaining on the GDPR 72-hour notification clock. Determine: (1) Was data exfiltrated? (2) Which regulators must be notified? (3) What is the notification content for each jurisdiction?"*
+
+**Practice resources (no paid service or support plan required):**
+
+- [Data Discovery and Classification with Amazon Macie](https://catalog.workshops.aws/data-discovery/en-US) — hands-on workshop covering S3 data scanning, custom data identifiers, Macie classification jobs, and Security Hub integration for understanding data exposure.
+- [AWS Foundational Security, Identity and Governance Workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/05554d54-07cc-483e-b810-d69f7d99b2ab/en-US) — demos and hands-on practice with security controls, governance frameworks, and compliance checks for AWS environments.
+- [Data Perimeter Workshop](https://catalog.workshops.aws/workshops/a11f0f32-cc23-4c95-b243-43c53bdc7177/en-US) — five lab modules teaching data perimeter controls for data loss prevention, including identity-based policies, resource-based policies, and VPC endpoint policies to restrict data access to authorized users from expected network locations.
+
+> 📖 **Reference:** [SEC10-BP04 Develop and test security incident response playbooks](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_develop_test_playbooks.html) — regularly test playbooks through tabletop exercises, simulations, and game days to verify processes work under time pressure.
+
+---
+
+## Part 2 — Detect & Analyze
+
+> **CSF 2.0 Functions:** Detect · Respond (Analyze)
+> **Goal:** Confirm personal data involvement, determine scope, assess exfiltration, and establish notification obligations.
+
+### 2.1 Initial Triage Questions
+
+These questions determine whether this playbook is activated and at what priority. The first three are activation gates — if any is "No," handle the incident with the appropriate technical playbook only. The scope assessment questions feed directly into the Privacy Officer's notification obligation assessment.
+
+Answer these quickly to determine scope and priority. The first three questions determine whether this playbook is activated.
+
+**Activation questions (all must be YES to proceed with this playbook):**
+
+- [ ] Has an unauthorized access, disclosure, or loss of data been confirmed or strongly suspected?
+- [ ] Does the affected data store contain personal data (PII, PHI, PCI, financial, biometric)?
+- [ ] Is the data identifiable to specific individuals (directly or through combination with other available data)?
+
+**Scope assessment questions:**
+
+- [ ] What categories of personal data are involved? (Names, emails, health records, financial data, government IDs, biometric data, children's data)
+- [ ] How many individuals are potentially affected?
+- [ ] In which jurisdictions do the affected individuals reside? (Determines which regulations apply)
+- [ ] Was the data encrypted at rest? Was the encryption key also compromised?
+- [ ] Has data left the AWS environment? (Check VPC Flow Logs, S3 server access logs, CloudTrail)
+- [ ] Is the technical containment already handled by another playbook? (If yes, this playbook focuses on regulatory/notification workstream)
+- [ ] When did the organization first become aware of the breach? (This starts the notification clock)
+- [ ] Is there a Record of Processing Activities (ROPA) that documents this data processing?
+- [ ] Was a Data Protection Impact Assessment (DPIA) conducted for this processing activity?
+
+**If personal data is confirmed involved AND data may have left the environment → P1 immediately. Notify Privacy Officer within 1 hour.**
+
+### 2.2 Data Classification & Sensitivity Assessment
+
+> `[Privacy Officer]` leads this assessment with support from `[IR Lead]` for technical evidence.
+
+Use Amazon Macie findings and your organization's data classification framework to determine what was exposed.
+
+**Data sensitivity tiers (highest to lowest regulatory impact):**
+
+| Tier | Data Types | Regulatory Implications |
+|---|---|---|
+| **Tier 1 — Special Category** | Health/medical (PHI), biometric, genetic, racial/ethnic origin, political opinions, religious beliefs, sexual orientation, children's data | GDPR Art. 9, HIPAA, mandatory individual notification in most jurisdictions |
+| **Tier 2 — High Sensitivity** | Government identifiers (SSN, SIN, TFN, passport), financial account numbers, payment card data (PAN), login credentials | PCI-DSS, identity theft risk, credit monitoring obligations likely |
+| **Tier 3 — Standard PII** | Names, email addresses, phone numbers, physical addresses, dates of birth, employment information | Standard notification obligations per jurisdiction |
+| **Tier 4 — Low Sensitivity** | Business contact information, publicly available information, pseudonymized data (where key not compromised) | Notification may not be required (assess per jurisdiction) |
+
+**Amazon Macie data identifiers to check:**
+
+| Macie Managed Data Identifier | Maps to Tier |
+|---|---|
+| `AUSTRALIA_TAX_FILE_NUMBER`, `CANADA_SOCIAL_INSURANCE_NUMBER`, `UK_NATIONAL_INSURANCE_NUMBER` | Tier 2 |
+| `CREDIT_CARD_NUMBER`, `BANK_ACCOUNT_NUMBER` | Tier 2 |
+| `AWS_CREDENTIALS`, `OPENSSH_PRIVATE_KEY` | Tier 2 |
+| `USA_SOCIAL_SECURITY_NUMBER`, `USA_PASSPORT_NUMBER` | Tier 2 |
+| `PHONE_NUMBER`, `EMAIL_ADDRESS`, `NAME` | Tier 3 |
+| `DATE_OF_BIRTH`, `ADDRESS` | Tier 3 |
+| Custom data identifiers (organization-specific) | Per classification |
+
+> 📌 Run a Macie classification job on the affected bucket(s) if automated discovery has not recently scanned them. Results typically available within 1–4 hours depending on data volume.
+
+#### Without Macie: Alternative Classification Approaches
+
+If Amazon Macie was not enabled prior to the incident, you can still determine data classification — it requires more manual effort but is achievable within notification timelines.
+
+**Option 1: Enable Macie now and run an on-demand classification job (recommended)**
+
+Macie can be enabled during an active incident. It does not require historical data or prior configuration to classify current bucket contents. Enable Macie, create a classification job scoped to the affected bucket(s), and results will be available within 1–4 hours. This is still the fastest path to defensible classification.
+
+**Option 2: Manual classification using available information**
+
+If Macie is not an option (organizational constraints, time pressure, or the data has already been deleted):
+
+1. **Check object key naming patterns** — filenames often indicate content type (e.g., `customer-export.csv`, `user-data/`, `pii-backup-20260501.json.gz`). This provides a quick initial signal.
+2. **Review application documentation** — check data dictionaries, database schemas, API documentation, or architecture diagrams that describe what the application stores in the affected bucket.
+3. **Ask the data owner directly** — the application team or data owner typically knows what data is stored and its sensitivity. This is often the fastest path during an incident.
+4. **Sample and inspect** — download a small sample of objects (2–3 files) to a forensic environment and manually review contents for personal data categories. Document what you find.
+5. **Check existing data classification tags** — if `DataClassification` tags are applied to the bucket or objects, use those as the starting point for sensitivity assessment.
+6. **Review CloudTrail object keys** — even without Macie, CloudTrail data events show which specific object keys were accessed. Object key names may indicate data type.
+
+**Regulatory posture without Macie:**
+
+> ⚠️ If you cannot definitively determine whether accessed data contains personal information, the conservative regulatory approach is to assume it does. Under GDPR, the inability to exclude personal data involvement is itself a factor that supports notification. Document your classification methodology and any limitations — regulators evaluate the reasonableness of your assessment, not whether you had perfect tooling.
+
+### 2.3 Evidence Documentation
+
+> ⚠️ **Evidence preservation is critical for regulatory investigations.** Regulators may request evidence months after the incident. Apply legal hold immediately. Failure to preserve evidence can result in adverse inferences and increased regulatory penalties.
+
+| Evidence Type | How to Collect | Where to Store |
+|---|---|---|
+| Macie sensitive data findings | Macie console → Findings → Export JSON | Forensic S3 bucket (Object Lock) |
+| Macie classification job results | Macie console → Jobs → Results | Forensic S3 bucket (Object Lock) |
+| S3 server access logs (affected buckets) | Copy from logging bucket for relevant time window | Forensic S3 bucket (Object Lock) |
+| CloudTrail data events (S3 GetObject, etc.) | Athena query (see resources file) | Forensic S3 bucket (Object Lock) |
+| CloudTrail management events | Athena query for IAM/S3 configuration changes | Forensic S3 bucket (Object Lock) |
+| GuardDuty exfiltration findings | `aws guardduty get-findings --detector-id ... --finding-ids ...` | Forensic S3 bucket (Object Lock) |
+| VPC Flow Logs (if data accessed via EC2/Lambda) | CloudWatch Logs export or S3 copy | Forensic S3 bucket (Object Lock) |
+| S3 bucket policy history | AWS Config timeline for the bucket resource | IR ticket |
+| IAM policy of accessing principal | `aws iam get-policy-version` + `aws iam list-attached-*-policies` | IR ticket |
+| Data inventory / ROPA extract | Internal privacy management system | IR ticket (restricted access) |
+| Notification clock start documentation | Screenshot/log of when awareness occurred | IR ticket |
+
+**Initiate legal hold immediately:**
+
+```bash
+# Apply Object Lock legal hold to forensic evidence bucket
+aws s3api put-object-legal-hold \
+  --bucket forensic-evidence-bucket \
+  --key "incidents/PDB-2026-001/" \
+  --legal-hold Status=ON
+
+# Confirm Object Lock is enabled on the forensic bucket
+aws s3api get-object-lock-configuration \
+  --bucket forensic-evidence-bucket
+```
+
+**Investigation queries for evidence collection:**
+
+The companion resource file [`resources/athena-queries-personal-data-breach.sql`](resources/athena-queries-personal-data-breach.sql) contains the full set of Athena queries for personal data breach investigation, including:
+
+- All S3 data access events on PII-classified buckets (Section 1.1–1.4)
+- Cross-account access detection
+- Bulk download pattern detection (exfiltration indicators)
+- Macie finding correlation with CloudTrail access events
+- GuardDuty and Macie CLI export commands
+
+Use these queries to build a complete evidence package for regulatory submissions.
+
+### 2.4 Determining Data Access Scope
+
+> `[IR Lead]` performs technical analysis. Results feed into `[Privacy Officer]`'s notification assessment.
+
+**Step 1: Identify what was accessed**
+
+Use CloudTrail data events to determine exactly which objects containing personal data were accessed. The Privacy Officer needs to understand what questions are being answered and what the results mean — this analysis is integral to the notification obligation assessment.
+
+> 📌 **Without Macie:** If Macie findings are not available to identify which objects contain PII, use the alternative approaches from [Section 2.2](#without-macie-alternative-classification-approaches) to determine which accessed objects are likely to contain personal data. Replace the Macie-derived object key list with keys identified through manual classification, data owner consultation, or naming pattern analysis.
+
+Run the following queries from [`resources/athena-queries-personal-data-breach.sql`](resources/athena-queries-personal-data-breach.sql):
+
+| Query | What It Answers | Feeds Into |
+|---|---|---|
+| **1.5 — Macie finding correlation** | Were objects *confirmed by Macie to contain PII* actually accessed during the incident window? | Notification obligation: confirms personal data was accessed, not just that the bucket was accessed |
+| **2.2 — Data volume determination** | How many unique objects were accessed and how much data was transferred? | GDPR Art. 33: "approximate number of records" field in regulator notification |
+| **1.3 — Individual count estimation** | How many individuals are potentially affected? | All jurisdictions: notification scope and individual notification feasibility |
+| **1.2 — Cross-account access** | Was data accessed from an account outside the organization? | Indicates disclosure to a third party — stronger notification trigger |
+
+**Step 2: Determine if data left the AWS environment**
+
+This is the critical question for notification obligations. Data accessed within AWS (e.g., by another AWS service or account) may have different risk implications than data confirmed exfiltrated to an external location.
+
+Indicators of exfiltration:
+- GuardDuty `Exfiltration:S3/MaliciousIPCaller` or `Exfiltration:S3/AnomalousBehavior` findings
+- CloudTrail `GetObject` calls from IP addresses outside known AWS ranges
+- VPC Flow Logs showing large outbound data transfers to unknown IPs
+- S3 replication configured to an external account
+- `CopyObject` calls to a bucket in an unknown account
+- CloudTrail `PutObject` to a bucket outside the organization (cross-account)
+
+Run query **2.3 — Exfiltration indicators** from the resources file. This identifies `GetObject` calls from non-private IP addresses — the single most important indicator for notification decisions.
+
+> 📌 **Important:** Even if you cannot confirm exfiltration, if data was accessed by an unauthorized party, most regulations treat this as a breach requiring notification. The inability to prove data *did not* leave the environment is itself a risk factor.
+
+### 2.5 Notification Obligation Assessment
+
+> `[Privacy Officer]` leads with `[Legal Counsel]` support. Complete within **24 hours** of awareness to preserve notification timeline options.
+
+For each jurisdiction where affected individuals reside, assess notification obligations:
+
+| Regulation | Jurisdiction | Trigger Met? | Notification Deadline | Authority to Notify | Notes |
+|---|---|---|---|---|---|
+| **GDPR Art. 33/34** | EU/EEA | ☐ Yes ☐ No ☐ TBD | 72 hours to DPA; without undue delay to individuals (if high risk) | Lead Supervisory Authority (DPA) | Clock starts at awareness. Incomplete notification acceptable with follow-up. |
+| **UK GDPR / DPA 2018** | United Kingdom | ☐ Yes ☐ No ☐ TBD | 72 hours to ICO | Information Commissioner's Office (ICO) | Separate from EU GDPR post-Brexit. |
+| **PIPEDA** | Canada | ☐ Yes ☐ No ☐ TBD | "As soon as feasible" to OPC and individuals | Office of the Privacy Commissioner (OPC) | Trigger: real risk of significant harm (RROSH). |
+| **CCPA/CPRA** | California, US | ☐ Yes ☐ No ☐ TBD | "Most expedient time possible" | California AG + affected individuals | Applies to unencrypted personal information. |
+| **HIPAA** | US (if PHI) | ☐ Yes ☐ No ☐ TBD | 60 days to HHS; without unreasonable delay to individuals | HHS OCR + individuals; media if >500 | Only if unsecured PHI. |
+| **PCI-DSS** | Global (if PAN) | ☐ Yes ☐ No ☐ TBD | Immediately to payment brands | Acquiring bank + card brands | Forensic investigation by PCI QSA may be required. |
+| **Australian NDB** | Australia | ☐ Yes ☐ No ☐ TBD | "As soon as practicable" (30-day assessment window) | OAIC + affected individuals | Trigger: likely to result in serious harm. |
+| **NIS2** | EU (if essential/important entity) | ☐ Yes ☐ No ☐ TBD | Early warning 24 hours; notification 72 hours; final report 1 month | National CSIRT or competent authority | Applies to essential and important entities. |
+| **DORA** | EU (if financial entity) | ☐ Yes ☐ No ☐ TBD | Initial 4 hours; intermediate 72 hours; final 1 month | National financial regulator | Major ICT-related incident classification required. |
+| **SEC Rules** | US (if public company) | ☐ Yes ☐ No ☐ TBD | 4 business days after materiality determination | SEC (Form 8-K) | Materiality assessment required. |
+
+> ⚠️ **The clock starts at awareness, not confirmation.** For GDPR, "awareness" means when you have a reasonable degree of certainty that a breach has occurred. Do not delay notification to complete investigation — submit an incomplete initial notification and follow up.
+
+### 2.6 Severity Determination
+
+| Confirmed? | Priority Assignment |
+|---|---|
+| Personal data confirmed exfiltrated outside AWS, large individual count, or high-sensitivity data (Tier 1/2) | P1 |
+| Personal data accessed by unauthorized party, exfiltration unclear, notification deadline approaching | P2 |
+| Personal data exposure suspected (e.g., bucket was public) but no confirmed access | P3 |
+| Policy violation on personal data store, no evidence of unauthorized access | P4 |
+
+### 2.7 AWS Security Incident Response Service
+
+> 📌 **If your organization has the AWS Security Incident Response service enabled, or has AWS Support, you can request assistance from the AWS Customer Incident Response Team (CIRT).**
+
+**P1 — Critical:** Engage AWS immediately.
+
+- **If you have the AWS Security Incident Response service enabled:** Sign into [AWS Security Incident Response](https://console.aws.amazon.com/security-ir/) via the console, choose **Create Case**, select **Resolve case with AWS**, and choose the appropriate request type — **Active Security Incident** for urgent incident response support, or **Investigations and Inquiries** for log analysis support, secondary confirmation, or general security posture questions.
+- **If you need assistance from AWS CIRT:** Open a support case with Critical severity and request assistance from the AWS Customer Incident Response Team (CIRT). Include relevant finding IDs and a summary of what you have observed.
+
+**P2 — High:** Engage AWS within 4 hours of awareness.
+
+- AWS CIRT can assist with evidence gathering and scope determination that directly supports your notification obligation assessment. They can help determine whether data left the AWS environment — often the critical question for notification decisions.
+
+**P3 — Medium:** Engage AWS as needed for evidence gathering support.
+
+- Even for lower-severity incidents, AWS CIRT can assist with CloudTrail analysis, Macie interpretation, and evidence documentation that supports regulatory submissions. Consider engaging if your team lacks experience with Athena queries against CloudTrail data events.
+
+> 📌 You do not need the Security Incident Response service to get help from AWS CIRT. All AWS customers can request CIRT assistance through a support case, regardless of support plan level.
+
+> The AWS Security Incident Response service can assist with evidence gathering and documentation that supports regulatory notification requirements. They do not provide legal advice on notification obligations.
+
+---
+
+## Part 3 — Contain
+
+> **CSF 2.0 Function:** Respond (Contain)
+> **Goal:** Stop further data access, preserve evidence for regulatory investigation, initiate legal hold, and document the notification clock.
+
+> 📌 **Note:** Technical containment of the underlying incident (credential revocation, network isolation, etc.) may already be handled by the parallel technical playbook (IRP-CredCompromise, IRP-DataAccess, IRP-InsiderThreat). This section focuses on containment actions specific to the personal data breach workstream.
+
+### 3.1 Containment Decision
+
+```
+Is personal data still actively being accessed or exfiltrated?
+│
+├── YES (active access ongoing)
+│     └── Coordinate with technical IR playbook for immediate access revocation
+│           Then proceed to 3.2 for evidence preservation
+│
+└── NO (access has stopped or technical containment already applied)
+      └── Proceed directly to 3.2 — focus on evidence preservation and clock documentation
+```
+
+### 3.2 Containment Actions
+
+> `[IR Lead]` coordinates technical actions. `[Privacy Officer]` coordinates regulatory actions. Both run in parallel.
+
+**Step 1: Stop further data access (coordinate with technical playbook)**
+
+If not already handled by the parallel technical playbook, restrict access to affected data stores immediately:
+
+```bash
+# Emergency: Apply deny-all bucket policy (preserves data, blocks all access)
+aws s3api put-bucket-policy --bucket customer-pii-bucket --policy '{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "EmergencyDenyAll",
+    "Effect": "Deny",
+    "Principal": "*",
+    "Action": "s3:*",
+    "Resource": [
+      "arn:aws:s3:::customer-pii-bucket",
+      "arn:aws:s3:::customer-pii-bucket/*"
+    ],
+    "Condition": {
+      "StringNotLike": {
+        "aws:PrincipalArn": [
+          "arn:aws:iam::123456789012:role/IncidentResponseRole",
+          "arn:aws:iam::123456789012:role/ForensicPreservationRole"
+        ]
+      }
+    }
+  }]
+}'
+```
+
+> ⚠️ **Warning:** This will break any applications reading from this bucket. Obtain `[Account Owner]` authorization before applying in production unless active exfiltration is confirmed (P1).
+
+**Step 2: Preserve evidence under legal hold**
+
+```bash
+# Enable Object Lock on forensic bucket (if not already configured)
+# Note: Object Lock must be enabled at bucket creation — use a pre-configured forensic bucket
+
+# Copy affected S3 access logs to forensic bucket with legal hold
+aws s3 cp s3://access-logs-bucket/customer-pii-bucket/ \
+  s3://forensic-evidence-bucket/incidents/PDB-2026-001/s3-access-logs/ \
+  --recursive
+
+# Apply legal hold to all preserved evidence
+aws s3api put-object-legal-hold \
+  --bucket forensic-evidence-bucket \
+  --key "incidents/PDB-2026-001/" \
+  --legal-hold Status=ON
+```
+
+**Step 3: Preserve CloudTrail logs**
+
+```bash
+# Export relevant CloudTrail logs to forensic bucket
+# Use Athena to query and export, or copy raw log files
+aws s3 cp s3://cloudtrail-logs-bucket/AWSLogs/123456789012/CloudTrail/ \
+  s3://forensic-evidence-bucket/incidents/PDB-2026-001/cloudtrail/ \
+  --recursive \
+  --exclude "*" \
+  --include "*2026-05-2*"
+```
+
+**Step 4: Document the notification clock**
+
+> `[Privacy Officer]` owns this step. This is a legal record that will be reviewed by regulators.
+
+The notification clock documentation must be created within 1 hour of personal data involvement being confirmed. This record is your primary defense against claims of delayed notification.
+
+Document the following in your incident management system:
+
+1. **Exact timestamp (UTC)** when the organization became aware of the personal data breach
+2. **How** awareness was achieved (Macie finding, GuardDuty alert, customer report, etc.) — include the finding ID or alert reference
+3. **Who** was first aware (role, not name) and who made the determination that personal data was involved
+4. **What** was known at the time of awareness — be specific about what was confirmed vs. suspected
+5. **Notification clock deadlines** calculated from the awareness timestamp (e.g., GDPR 72h = [specific UTC timestamp])
+
+This record establishes the start of the notification clock for GDPR (72 hours), NIS2 (24 hours early warning), and other time-bound obligations.
+
+**Step 5: Initiate legal hold on all relevant systems**
+
+> `[Legal Counsel]` authorizes. `[IR Lead]` implements.
+
+Legal hold prevents the routine deletion or modification of evidence that may be required by regulators months or years after the incident. Implement legal hold across all systems that may contain evidence of the breach scope, timeline, or response actions.
+
+Place legal hold on:
+- [ ] All S3 access logs for affected buckets (full retention period)
+- [ ] CloudTrail logs for affected accounts (full retention period)
+- [ ] VPC Flow Logs for affected VPCs
+- [ ] Application logs that may contain access records
+- [ ] Email and messaging records related to the incident
+- [ ] Macie findings and classification job results
+- [ ] GuardDuty findings related to the incident
+- [ ] Any backup or replica of the affected data
+
+For S3-stored evidence, apply Object Lock legal hold:
+
+```bash
+# Apply legal hold to preserved evidence (run after copying to forensic bucket)
+aws s3api put-object-legal-hold \
+  --bucket forensic-evidence-bucket \
+  --key "incidents/PDB-2026-001/" \
+  --legal-hold Status=ON
+```
+
+Notify all system administrators that legal hold is in effect and no logs or data within the hold scope may be deleted, modified, or allowed to expire through normal retention policies.
+
+### 3.3 Document Containment Actions
+
+After containment, document and confirm the following before any data modification or deletion. This checklist serves as both an operational gate and a regulatory evidence record — regulators will ask what containment measures were taken and when.
+
+- [ ] All S3 access logs for affected buckets copied to forensic bucket with Object Lock
+- [ ] CloudTrail logs (management + data events) preserved for the full incident window
+- [ ] Macie findings exported and preserved
+- [ ] GuardDuty findings exported and preserved
+- [ ] VPC Flow Logs exported (if applicable)
+- [ ] Legal hold applied to all forensic evidence
+- [ ] CloudTrail log integrity validation confirmed on preserved logs
+- [ ] Chain of custody documented (who collected what, when, how)
+- [ ] Notification clock start time formally documented and communicated to Privacy Officer
+
+---
+
+## Part 4 — Eradicate & Recover
+
+> **CSF 2.0 Function:** Respond (Eradicate) · Recover
+> **Goal:** Confirm the full scope of personal data affected, determine notification content, prepare regulatory submissions, and implement individual protections.
+
+> 📌 **Note:** Technical eradication (removing threat actor access, closing vulnerabilities) is handled by the parallel technical playbook. This section focuses on the regulatory, notification, and individual protection workstream.
+
+### 4.1 Full Scope Determination
+
+> `[IR Lead]` provides technical findings. `[Privacy Officer]` interprets for regulatory purposes.
+
+Before preparing notifications, confirm the following with as much precision as possible:
+
+**Data scope:**
+- [ ] Exact data categories involved (names, emails, government IDs, health data, financial data, etc.)
+- [ ] Number of unique individuals affected (or best estimate with confidence range)
+- [ ] Jurisdictions of affected individuals (determines which regulations apply)
+- [ ] Time period of exposure (when did unauthorized access begin and end?)
+- [ ] Whether data was encrypted and whether encryption keys were also compromised
+- [ ] Whether data has been confirmed exfiltrated or only accessed
+
+**Individual impact assessment:**
+- [ ] What is the likely harm to individuals? (Identity theft, financial fraud, discrimination, reputational damage)
+- [ ] Are vulnerable populations affected? (Children, patients, employees)
+- [ ] Can affected individuals be individually identified for notification?
+- [ ] What protective measures can be offered? (Credit monitoring, identity protection, password resets)
+
+### 4.2 Notification Content Preparation
+
+> `[Privacy Officer]` leads content preparation. `[Legal Counsel]` reviews. `[Communications Lead]` finalizes language.
+
+**Regulator notification content (GDPR Art. 33 template elements):**
+
+Each regulatory notification should include (adapt per jurisdiction requirements):
+
+1. **Nature of the breach** — What happened, categories of data, approximate number of individuals
+2. **Contact details** — DPO or privacy contact point name and details
+3. **Likely consequences** — Assessment of potential harm to individuals
+4. **Measures taken** — Actions taken to address the breach and mitigate harm
+5. **Measures to mitigate** — Steps individuals can take to protect themselves
+
+**Individual notification content (GDPR Art. 34 template elements):**
+
+1. **Clear, plain language description** of what happened
+2. **What personal data was involved** (be specific — "your name, email address, and date of birth")
+3. **What we are doing about it** (containment, investigation, remediation)
+4. **What you can do** (change passwords, monitor accounts, credit monitoring enrollment)
+5. **Contact information** for questions (dedicated support line/email)
+6. **Apology and commitment** to preventing recurrence
+
+> ⚠️ **Legal privilege:** Draft notifications under legal privilege until finalized. Mark all drafts as "PRIVILEGED AND CONFIDENTIAL — PREPARED AT THE DIRECTION OF LEGAL COUNSEL."
+
+### 4.3 Regulatory Submission Preparation
+
+> `[Privacy Officer]` prepares submissions. `[Legal Counsel]` approves before filing.
+
+**For each applicable jurisdiction:**
+
+| Jurisdiction | Submission Method | Key Deadlines | Status |
+|---|---|---|---|
+| EU/EEA (GDPR) | DPA online portal (varies by member state) | 72 hours initial; follow-up as needed | ☐ Submitted ☐ Pending |
+| UK (ICO) | [ICO breach reporting tool](https://ico.org.uk/for-organizations/report-a-breach/) | 72 hours | ☐ Submitted ☐ Pending |
+| Canada (PIPEDA) | [OPC breach report form](https://www.priv.gc.ca/en/report-a-concern/report-a-privacy-breach-at-your-organization/) | As soon as feasible | ☐ Submitted ☐ Pending |
+| California (CCPA) | [California AG breach reporting](https://oag.ca.gov/privacy/databreach/reporting) | Most expedient time possible | ☐ Submitted ☐ Pending |
+| Australia (NDB) | [OAIC NDB form](https://www.oaic.gov.au/privacy/notifiable-data-breaches/report-a-data-breach) | As soon as practicable | ☐ Submitted ☐ Pending |
+| US (HIPAA) | [HHS breach portal](https://ocrportal.hhs.gov/ocr/breach/wizard_breach.jsf) | 60 days | ☐ Submitted ☐ Pending |
+| US (SEC) | Form 8-K filing | 4 business days after materiality determination | ☐ Submitted ☐ Pending |
+
+**AWS Artifact for compliance documentation:**
+
+Use [AWS Artifact](https://console.aws.amazon.com/artifact/) to retrieve:
+- AWS SOC 2 Type II report (demonstrates AWS infrastructure security controls)
+- AWS PCI-DSS Attestation of Compliance (if PCI data involved)
+- AWS ISO 27001 certificate
+- AWS HIPAA compliance documentation (if PHI involved)
+
+These documents may be requested by regulators to demonstrate the security posture of the infrastructure hosting the affected data.
+
+### 4.4 Individual Notification & Protection
+
+> `[Communications Lead]` manages notification delivery. `[Customer Support Lead]` manages incoming inquiries.
+
+**Notification delivery:**
+- [ ] Individual notification content finalized and approved by Legal
+- [ ] Notification delivery method determined (email, postal mail, public notice)
+- [ ] Dedicated support channel established (phone line, email address, FAQ page)
+- [ ] Customer support team briefed on incident details and approved responses
+- [ ] Notification sent to all identifiable affected individuals
+- [ ] Delivery confirmation tracked (email delivery receipts, postal tracking)
+
+**Individual protection measures (if applicable):**
+- [ ] Credit monitoring service enrolled for affected individuals (if government IDs or financial data exposed)
+- [ ] Identity protection service offered (if Tier 1 or Tier 2 data exposed)
+- [ ] Password reset forced for affected accounts (if credentials exposed)
+- [ ] Fraud alert placement guidance provided to individuals
+- [ ] Dedicated FAQ page published with incident details and self-help guidance
+
+### 4.5 Recovery Validation
+
+Confirm the following before declaring the personal data breach workstream resolved:
+
+- [ ] All applicable regulatory notifications submitted within required timeframes
+- [ ] Individual notifications sent to all identifiable affected individuals
+- [ ] Credit monitoring or identity protection services activated (if applicable)
+- [ ] Dedicated support channel operational and staffed
+- [ ] Technical root cause addressed (confirmed with technical IR playbook lead)
+- [ ] No further unauthorized access to personal data detected
+- [ ] AWS Security Incident Response case updated with regulatory submission details (if applicable)
+- [ ] All evidence preserved under legal hold with documented chain of custody
+- [ ] Privacy Officer confirms notification obligations are satisfied (or follow-up timeline documented)
+
+---
+
+## Part 5 — Post-Incident Activity
+
+> **CSF 2.0 Function:** Identify (Improve) — continuous improvement, not a one-time activity
+> **Goal:** Complete regulatory follow-up, track individual notifications, update privacy controls, and improve data protection posture.
+
+Post-incident activities for personal data breaches extend well beyond the typical technical incident. Regulatory follow-up can continue for months (GDPR final reports, HIPAA annual reporting, enforcement proceedings), and individual notification tracking may require dedicated resources. The key difference from technical post-incident work is that *regulators will evaluate your response quality* — documentation produced here may be reviewed under enforcement action.
+
+### 5.1 Timeline Reconstruction
+
+Document the full incident timeline including both technical and regulatory workstreams. Complete within 24–48 hours while memory is fresh. This timeline will be referenced by regulators during any enforcement proceedings and should be treated as a formal record.
+
+| Timestamp (UTC) | Event | Source / Evidence | Actor |
+|---|---|---|---|
+| YYYY-MM-DD HH:MM | Initial unauthorized access to personal data | CloudTrail data events | Threat actor |
+| YYYY-MM-DD HH:MM | Detection (Macie/GuardDuty/other) | Finding ID | AWS service |
+| YYYY-MM-DD HH:MM | IR team notified | On-call alert | IR Lead |
+| YYYY-MM-DD HH:MM | **Personal data involvement confirmed (CLOCK STARTS)** | Macie finding / manual review | IR Lead |
+| YYYY-MM-DD HH:MM | Privacy Officer notified | Internal escalation | IR Lead |
+| YYYY-MM-DD HH:MM | Technical containment applied | Technical playbook | IR Lead |
+| YYYY-MM-DD HH:MM | Legal hold initiated | Legal authorization | Legal Counsel |
+| YYYY-MM-DD HH:MM | Scope determination completed | Investigation findings | IR Lead + Privacy Officer |
+| YYYY-MM-DD HH:MM | Notification decision made | Regulatory assessment | Privacy Officer + Legal |
+| YYYY-MM-DD HH:MM | Regulator notification submitted | Submission confirmation | Privacy Officer |
+| YYYY-MM-DD HH:MM | Individual notifications sent | Delivery confirmation | Communications Lead |
+| YYYY-MM-DD HH:MM | Incident resolved | Recovery validation | IR Lead |
+
+**Key metrics to capture:**
+
+| Metric | Value | Why It Matters |
+|---|---|---|
+| Time to Detect (TTD) | *HH:MM from initial access to detection* | Indicates whether monitoring (Macie, GuardDuty) is tuned for personal data stores |
+| Time to Awareness (TTA) | *HH:MM from detection to personal data involvement confirmed* | Measures gap between generic alert and privacy-specific escalation |
+| Time to Notify Privacy Officer | *HH:MM from awareness to Privacy Officer notification* | Must be ≤1 hour. Directly consumes notification window. |
+| Time to Contain (TTC) | *HH:MM from awareness to access stopped* | Ongoing access increases both breach scope and regulatory exposure |
+| Time to Regulator Notification | *HH:MM from awareness to regulatory submission* | Must be ≤72 hours for GDPR. Late notification is itself a violation. |
+| Time to Individual Notification | *HH:MM from awareness to individual notifications sent* | Delayed individual notification increases harm to data subjects |
+| GDPR 72-hour compliance | *Yes/No — was regulator notified within 72 hours?* | Binary pass/fail metric for the most common regulatory deadline |
+| Total Incident Duration | *HH:MM from initial access to recovery validated* | Measures overall response effectiveness across both workstreams |
+| Individuals Affected | *Count (confirmed)* | Primary metric for regulatory severity assessment and media exposure risk |
+| Data Categories Involved | *List* | Determines which notification obligations apply and what protections to offer |
+| Jurisdictions Notified | *List* | Audit trail for regulatory compliance across all applicable jurisdictions |
+
+### 5.2 Regulatory Follow-Up
+
+> `[Privacy Officer]` owns ongoing regulatory engagement. `[Legal Counsel]` advises.
+
+Many regulations require follow-up after the initial notification:
+
+- [ ] **GDPR:** Final report submitted to DPA with complete investigation findings
+- [ ] **NIS2:** Final report submitted within 1 month of incident notification
+- [ ] **DORA:** Final report submitted within 1 month of initial notification
+- [ ] **HIPAA:** Annual report to HHS if breach affected >500 individuals
+- [ ] **Regulator questions:** All additional information requests from regulators answered within requested timeframes
+- [ ] **Enforcement actions:** Monitor for and respond to any regulatory enforcement proceedings
+- [ ] **Documentation:** Complete incident file maintained for minimum regulatory retention period (typically 5+ years)
+
+### 5.3 Individual Notification Tracking
+
+- [ ] Delivery confirmation received for all individual notifications
+- [ ] Undeliverable notifications re-sent via alternative method (postal if email bounced)
+- [ ] Support channel inquiry volume tracked and adequately staffed
+- [ ] Credit monitoring / identity protection enrollment rates tracked
+- [ ] Individual complaints or escalations documented and addressed
+- [ ] Public notice published (if individual notification not feasible for all affected persons)
+
+### 5.4 Post-Incident Review
+
+Conduct a blameless post-incident review within **5 business days** for P1/P2, **15 business days** for P3/P4. For personal data breaches, include the Privacy Officer and Legal Counsel in the review — their perspective on notification effectiveness and regulatory interaction is as important as the technical root cause analysis.
+
+Discussion questions (in addition to standard technical review):
+
+1. Was personal data involvement identified quickly enough? Could classification or tagging have accelerated this?
+2. Was the Privacy Officer notified within the 1-hour internal target?
+3. Were notification obligations assessed within 24 hours of awareness?
+4. Were regulatory notifications submitted within required timeframes? If not, why?
+5. Was the data inventory (ROPA) accurate and helpful during scope determination?
+6. Were individual notifications clear, complete, and delivered effectively?
+7. Did the organization have adequate data classification to quickly identify what was exposed?
+8. Were there gaps in S3 data event logging that hindered scope determination?
+9. Was Macie coverage sufficient to identify all personal data in the affected data stores?
+10. Were the preparation steps in Part 1 adequate? Were there tools, access, or processes we needed during the incident that weren't pre-provisioned?
+11. What single change would most reduce the likelihood or impact of a similar breach?
+
+### 5.5 Privacy & Data Protection Improvements
+
+Based on lessons learned, implement improvements:
+
+- [ ] **DPIA update:** Update the Data Protection Impact Assessment for the affected processing activity
+- [ ] **ROPA update:** Ensure Record of Processing Activities accurately reflects current data flows
+- [ ] **Data minimization:** Review whether all personal data in the affected store was necessary for the stated purpose
+- [ ] **Retention review:** Implement or enforce data retention policies to reduce volume of personal data at risk
+- [ ] **Macie coverage:** Expand Macie automated discovery to cover any gaps identified during the incident
+- [ ] **Access controls:** Implement least-privilege access to personal data stores (review IAM policies, bucket policies, VPC endpoints)
+- [ ] **Encryption:** Ensure all personal data is encrypted at rest with customer-managed keys (CMK) where appropriate
+- [ ] **Monitoring:** Enhance monitoring on personal data stores (CloudTrail data events, S3 access logging, GuardDuty S3 protection)
+- [ ] **Privacy by design:** Incorporate findings into development practices (data classification at creation, automated tagging, access logging by default)
+- [ ] **Training:** Update privacy and security awareness training based on incident root cause
+
+### 5.6 Detection Gap Analysis
+
+| Gap | Root Cause | Recommended Fix | Owner | Target Date |
+|---|---|---|---|---|
+| *(e.g., Macie not enabled on affected bucket)* | *(Bucket created after Macie onboarding)* | *(Automate Macie coverage for new buckets via Config rule)* | | |
+| *(e.g., No CloudTrail data events on PII bucket)* | *(Data events not enabled for this bucket)* | *(Enable data events on all buckets tagged DataClassification:PII)* | | |
+| *(e.g., Cross-account access not alerted)* | *(No alarm on cross-account S3 access)* | *(Create CloudWatch alarm for cross-account GetObject on PII buckets)* | | |
+
+### 5.7 Playbook Update Checklist
+
+- [ ] Were triage questions sufficient to quickly identify personal data involvement?
+- [ ] Was the notification obligation assessment table complete for all applicable jurisdictions?
+- [ ] Were notification templates adequate or did they require significant modification?
+- [ ] Were evidence preservation steps sufficient for regulatory requirements?
+- [ ] Were any new regulations or jurisdictions identified that should be added?
+- [ ] Were Athena queries effective for scope determination?
+- [ ] Were communication templates clear and approved quickly by Legal?
+- [ ] Update **Last Reviewed** date and increment **Playbook Version**.
+
+---
+
+## Appendix A — Investigation Resources
+
+The full set of Athena queries and CLI commands for personal data breach investigation are maintained in a companion file for easier use in Athena consoles and scripts:
+
+📄 **[`resources/athena-queries-personal-data-breach.sql`](resources/athena-queries-personal-data-breach.sql)**
+
+This file contains:
+
+| Section | Queries | Purpose |
+|---|---|---|
+| **Evidence Collection** | 1.1–1.5 | Broad evidence capture for regulatory preservation — all access events, cross-account detection, individual count estimation, bulk download patterns, Macie correlation |
+| **Scope Determination** | 2.1–2.4 | Help the Privacy Officer determine breach scope — all access by suspect principal, data volume quantification, exfiltration indicators, configuration change detection |
+| **Finding Exports** | 3 (CLI) | GuardDuty and Macie CLI commands for exporting findings as regulatory evidence |
+
+> 📌 **Usage:** Replace placeholder values (bucket names, account IDs, role ARNs, time windows) with your actual values before running. The queries in Section 2.4 of the main playbook body are the most critical for the Privacy Officer's notification assessment and are kept inline for immediate reference.
+
+---
+
+## Appendix B — Regulatory & Compliance Considerations
+
+> `[Legal Counsel]` and `[Privacy Officer]` own this section during an active incident.
+
+See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
+
+### Notification Timeline Summary
+
+| Regulation | Clock Starts At | Initial Notification Deadline | Follow-Up Required |
+|---|---|---|---|
+| **GDPR Art. 33** | Awareness of breach | 72 hours to supervisory authority | Yes — final report when investigation complete |
+| **GDPR Art. 34** | Determination of high risk | Without undue delay to individuals | No fixed follow-up (but must be complete) |
+| **UK GDPR** | Awareness of breach | 72 hours to ICO | Yes — update if new information |
+| **PIPEDA** | Determination of RROSH | As soon as feasible to OPC + individuals | Records must be kept for 24 months |
+| **CCPA/CPRA** | Discovery of breach | Most expedient time possible (no fixed hours) | No fixed follow-up |
+| **HIPAA** | Discovery of breach | 60 days to HHS; without unreasonable delay to individuals | Annual report for breaches >500 |
+| **PCI-DSS** | Confirmation of compromise | Immediately to payment brands | Forensic investigation report required |
+| **Australian NDB** | Completion of assessment (30-day window) | As soon as practicable after assessment | Statement must remain on website for 12 months |
+| **NIS2** | Awareness of significant incident | 24 hours (early warning); 72 hours (notification); 1 month (final) | Final report within 1 month |
+| **DORA** | Classification as major incident | 4 hours (initial); 72 hours (intermediate); 1 month (final) | Final report within 1 month |
+| **SEC** | Materiality determination | 4 business days (Form 8-K) | Annual report (10-K) disclosure |
+
+### Key Principles for Notification Decisions
+
+1. **When in doubt, notify.** It is better to submit an incomplete initial notification and update later than to miss a deadline. Most regulations explicitly allow for phased reporting.
+
+2. **The clock starts at awareness, not confirmation.** For GDPR, "awareness" means a reasonable degree of certainty that a breach has occurred. You do not need to complete your investigation before notifying.
+
+3. **Containment does not eliminate notification obligations.** Even if you contained the breach within minutes, if personal data was accessed by an unauthorized party, notification obligations likely apply.
+
+4. **Encryption matters.** If data was encrypted with a strong algorithm AND the encryption key was not compromised, some regulations (notably HIPAA "safe harbor" and some GDPR interpretations) may not require notification. Document this analysis carefully.
+
+5. **Document the decision either way.** Whether you decide to notify or not, document the rationale. Regulators may later ask why you did or did not notify.
+
+### AWS Shared Responsibility for Breach Notification
+
+- **AWS responsibility:** Notify customers if AWS infrastructure is compromised (per AWS Customer Agreement and Shared Responsibility Model)
+- **Customer responsibility:** Notify regulators and individuals if customer data is breached due to customer configuration, access management, or application vulnerabilities
+- **AWS support:** AWS Security Incident Response service can assist with evidence gathering and documentation but does not provide legal advice on notification obligations
+
+---
+
+## Appendix C — Communication Templates
+
+> ⚠️ **These are starting templates only.** All notifications must be reviewed and approved by `[Legal Counsel]` before submission. Adapt language to your organization's tone, the specific incident facts, and jurisdictional requirements.
+
+### C.1 Regulator Notification Template (GDPR Art. 33)
+
+```
+PERSONAL DATA BREACH NOTIFICATION
+Submitted pursuant to Article 33 of the General Data Protection Regulation
+
+1. NATURE OF THE BREACH
+   - Type of breach: [Confidentiality / Integrity / Availability]
+   - Description: [Brief factual description of what occurred]
+   - Date/time breach occurred: [If known]
+   - Date/time breach discovered: [Timestamp]
+   - Categories of personal data: [e.g., names, email addresses, dates of birth,
+     government identification numbers]
+   - Approximate number of data subjects: [Number or range]
+   - Approximate number of records: [Number or range]
+
+2. DATA PROTECTION OFFICER CONTACT
+   - Name: [DPO name]
+   - Email: [DPO email]
+   - Phone: [DPO phone]
+
+3. LIKELY CONSEQUENCES
+   - [Description of potential impact on individuals — e.g., risk of identity theft,
+     financial fraud, reputational damage]
+
+4. MEASURES TAKEN OR PROPOSED
+   - Containment: [Actions taken to stop the breach]
+   - Mitigation: [Actions to reduce harm to individuals — e.g., credit monitoring,
+     password resets, enhanced monitoring]
+   - Prevention: [Actions to prevent recurrence]
+
+5. INDIVIDUAL NOTIFICATION
+   - Have individuals been notified? [Yes / No / Planned]
+   - If no, justification: [e.g., investigation ongoing, disproportionate effort,
+     data rendered unintelligible]
+
+6. ADDITIONAL INFORMATION
+   - [Any other relevant details]
+   - [Note: This is an initial notification. A supplementary report will follow
+     when the investigation is complete.]
+```
+
+### C.2 Individual Notification Template
+
+```
+Subject: Important Notice About Your Personal Data
+
+Dear [Name / "Valued Customer"],
+
+We are writing to inform you of a security incident that may have affected
+your personal data. We take the protection of your information seriously and
+want to provide you with the details of what happened, what we are doing
+about it, and what you can do to protect yourself.
+
+WHAT HAPPENED
+[Clear, factual description in plain language. Avoid technical jargon.
+Include approximate dates.]
+
+WHAT INFORMATION WAS INVOLVED
+The following categories of your personal data may have been affected:
+- [List specific data types — e.g., "your name, email address, and date of birth"]
+
+WHAT WE ARE DOING
+- [Containment action taken]
+- [Investigation status]
+- [Remediation steps]
+- [Offer of credit monitoring / identity protection if applicable]
+
+WHAT YOU CAN DO
+- [Specific, actionable steps — e.g., "Change your password at [URL]"]
+- [Monitor your accounts for unusual activity]
+- [Enroll in the complimentary credit monitoring service we are providing:
+  [enrollment URL/instructions]]
+- [Contact your bank if you notice unauthorized transactions]
+
+FOR MORE INFORMATION
+If you have questions or concerns, please contact our dedicated support team:
+- Email: [dedicated email]
+- Phone: [dedicated phone line]
+- FAQ: [URL to incident FAQ page]
+
+We sincerely apologize for this incident and any concern it may cause you.
+We are committed to protecting your information and are taking steps to
+prevent this from happening again.
+
+Sincerely,
+[Organization name]
+[Date]
+```
+
+### C.3 Internal Stakeholder Briefing Template
+
+```
+PERSONAL DATA BREACH — INTERNAL BRIEFING
+Classification: CONFIDENTIAL — DO NOT DISTRIBUTE EXTERNALLY
+
+Incident ID: [ID]
+Briefing Date: [Date]
+Prepared by: [Role]
+
+SUMMARY
+- Incident type: Personal data breach
+- Status: [Active / Contained / Resolved]
+- Severity: [P1/P2/P3/P4]
+- Individuals affected: [Count]
+- Data types: [Categories]
+- Jurisdictions: [List]
+
+NOTIFICATION STATUS
+- Regulator notifications: [Submitted / Pending / Not required]
+- Individual notifications: [Sent / Pending / Not required]
+- Deadlines: [Next deadline and countdown]
+
+ACTIONS REQUIRED
+- [Role]: [Action needed] by [deadline]
+- [Role]: [Action needed] by [deadline]
+
+NEXT UPDATE: [Date/time]
+```
+
+---
+
+## Appendix D — Data Classification Quick Reference
+
+### Amazon Macie Managed Data Identifiers (Key Categories)
+
+| Category | Examples | Regulatory Relevance |
+|---|---|---|
+| **Financial** | Credit card numbers (PAN), bank account numbers, SWIFT codes | PCI-DSS, CCPA, GDPR |
+| **Personal Identification** | SSN (US), SIN (Canada), TFN (Australia), NI number (UK), passport numbers | GDPR, PIPEDA, NDB, CCPA |
+| **Health** | Medical record numbers, health insurance IDs, prescription information | HIPAA, GDPR Art. 9 |
+| **Contact** | Email addresses, phone numbers, physical addresses | GDPR, CCPA, PIPEDA |
+| **Credentials** | AWS access keys, private keys, API tokens | All (if used to access personal data) |
+| **Demographic** | Dates of birth, gender, ethnicity, religious affiliation | GDPR Art. 9 (special categories) |
+
+### Data Classification Tags (Recommended)
+
+Apply these tags to S3 buckets, DynamoDB tables, RDS instances, and other data stores:
+
+| Tag Key | Tag Values | Purpose |
+|---|---|---|
+| `DataClassification` | `PII`, `PHI`, `PCI`, `Financial`, `Biometric`, `Public`, `Internal`, `Confidential` | Primary classification |
+| `DataSubjects` | `Customers`, `Employees`, `Partners`, `Patients`, `Children` | Identifies whose data |
+| `DataJurisdictions` | `EU`, `UK`, `CA`, `US-CA`, `AU`, `Global` | Determines applicable regulations |
+| `RetentionPolicy` | `30d`, `1y`, `3y`, `7y`, `Indefinite` | Data retention period |
+| `DPIARequired` | `Yes`, `No`, `Completed` | DPIA status |
+
+---
+
+## Appendix E — Reference Links
+
+### AWS Services & Documentation
+
+- [Amazon Macie User Guide](https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html)
+- [Amazon Macie Finding Types](https://docs.aws.amazon.com/macie/latest/user/findings-types.html)
+- [Amazon Macie Managed Data Identifiers](https://docs.aws.amazon.com/macie/latest/user/managed-data-identifiers.html)
+- [Amazon GuardDuty S3 Protection](https://docs.aws.amazon.com/guardduty/latest/ug/s3-protection.html)
+- [AWS CloudTrail Data Events](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html)
+- [AWS Security Incident Response Service](https://docs.aws.amazon.com/security-ir/latest/userguide/what-is-security-ir.html)
+- [AWS Artifact](https://aws.amazon.com/artifact/)
+- [S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html)
+- [AWS Security Incident Response Guide](https://docs.aws.amazon.com/whitepapers/latest/aws-security-incident-response-guide/aws-security-incident-response-guide.html)
+
+### Frameworks & Standards
+
+- [NIST SP 800-61r3 — Incident Response Recommendations and Considerations for Cybersecurity Risk Management](https://csrc.nist.gov/pubs/sp/800/61/r3/final)
+- [NIST CSF 2.0](https://www.nist.gov/cyberframework)
+- [AWS Well-Architected Framework — Security Pillar: Incident Response](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/incident-response.html)
+- [AWS Well-Architected Framework — Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
+- [AWS CIRT Workshop Materials (GitHub)](https://github.com/aws-samples/aws-incident-response-playbooks-workshop/)
+
+### Regulatory References
+
+- [GDPR Full Text (Art. 33 & 34)](https://gdpr-info.eu/art-33-gdpr/)
+- [UK ICO Breach Reporting](https://ico.org.uk/for-organizations/report-a-breach/)
+- [CCPA/CPRA Text](https://oag.ca.gov/privacy/ccpa)
+- [HIPAA Breach Notification Rule](https://www.hhs.gov/hipaa/for-professionals/breach-notification/index.html)
+- [PCI-DSS v4.0 Requirement 12.10](https://www.pcisecuritystandards.org/)
+- [PIPEDA Breach Reporting (OPC)](https://www.priv.gc.ca/en/privacy-topics/business-privacy/safeguards-and-breaches/privacy-breaches/respond-to-a-privacy-breach-at-your-business/)
+- [Australian NDB Scheme (OAIC)](https://www.oaic.gov.au/privacy/notifiable-data-breaches)
+- [NIS2 Directive](https://digital-strategy.ec.europa.eu/en/policies/nis2-directive)
+- [DORA Regulation](https://www.digital-operational-resilience-act.com/)
+- [SEC Cybersecurity Disclosure Rules](https://www.sec.gov/rules/final/2023/33-11216.pdf)
+
+### Privacy & Data Protection
+
+- [EDPB Guidelines on Personal Data Breach Notification](https://edpb.europa.eu/our-work-tools/our-documents/guidelines/guidelines-92022-personal-data-breach-notification-under_en)
+- [ICO Personal Data Breach Assessment Guidance](https://ico.org.uk/for-organizations/report-a-breach/personal-data-breach-assessment/)
+- [OAIC Data Breach Preparation and Response Guide](https://www.oaic.gov.au/privacy/guidance-and-advice/data-breach-preparation-and-response)
+- [Threat Technique Catalog for AWS](https://aws-samples.github.io/threat-technique-catalog-for-aws/)
+
+---
+
+## Revision History
+
+| Version | Date | Author | Change Summary |
+|---|---|---|---|
+| 1.0 | 2025-03-15 | IR Team | Initial draft — basic notification workflow |
+| 2.0 | 2026-05-28 | IR Team | Complete rewrite: NIST SP 800-61r3 alignment, expanded regulatory coverage (NIS2, DORA, SEC), Macie integration, Athena queries, communication templates, DPIA/ROPA references, Game Day scenario |
+| 2.1 | 2026-06-18 | IR Team | Modernization pass: Well-Architected references (SEC10-BP01/04/05/06), context paragraphs for all preparation sections, expanded escalation path to numbered steps, metrics with "Why It Matters" rationale, Athena queries moved to resources file, Section 2.7 expanded to P1–P3, Section 3.3 reframed as containment documentation, preparation adequacy review question, spelling standardization (American English), workshop resources added |
