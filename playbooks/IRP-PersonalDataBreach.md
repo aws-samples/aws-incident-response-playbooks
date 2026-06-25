@@ -568,7 +568,7 @@ Each regulatory notification should include (adapt per jurisdiction requirements
 | Jurisdiction | Submission Method | Key Deadlines | Status |
 |---|---|---|---|
 | EU/EEA (GDPR) | DPA online portal (varies by member state) | 72 hours initial; follow-up as needed | ☐ Submitted ☐ Pending |
-| UK (ICO) | [ICO breach reporting tool](https://ico.org.uk/for-organizations/report-a-breach/) | 72 hours | ☐ Submitted ☐ Pending |
+| UK (ICO) | [ICO breach reporting tool](https://ico.org.uk/for-organisations/report-a-breach/) | 72 hours | ☐ Submitted ☐ Pending |
 | Canada (PIPEDA) | [OPC breach report form](https://www.priv.gc.ca/en/report-a-concern/report-a-privacy-breach-at-your-organization/) | As soon as feasible | ☐ Submitted ☐ Pending |
 | California (CCPA) | [California AG breach reporting](https://oag.ca.gov/privacy/databreach/reporting) | Most expedient time possible | ☐ Submitted ☐ Pending |
 | Australia (NDB) | [OAIC NDB form](https://www.oaic.gov.au/privacy/notifiable-data-breaches/report-a-data-breach) | As soon as practicable | ☐ Submitted ☐ Pending |
@@ -977,11 +977,11 @@ Apply these tags to S3 buckets, DynamoDB tables, RDS instances, and other data s
 ### Regulatory References
 
 - [GDPR Full Text (Art. 33 & 34)](https://gdpr-info.eu/art-33-gdpr/)
-- [UK ICO Breach Reporting](https://ico.org.uk/for-organizations/report-a-breach/)
+- [UK ICO Breach Reporting](https://ico.org.uk/for-organisations/report-a-breach/)
 - [CCPA/CPRA Text](https://oag.ca.gov/privacy/ccpa)
 - [HIPAA Breach Notification Rule](https://www.hhs.gov/hipaa/for-professionals/breach-notification/index.html)
 - [PCI-DSS v4.0 Requirement 12.10](https://www.pcisecuritystandards.org/)
-- [PIPEDA Breach Reporting (OPC)](https://www.priv.gc.ca/en/privacy-topics/business-privacy/safeguards-and-breaches/privacy-breaches/respond-to-a-privacy-breach-at-your-business/)
+- [PIPEDA Breach Reporting (OPC)](https://www.priv.gc.ca/en/report-a-concern/report-a-privacy-breach-at-your-organization/report-a-privacy-breach-at-your-business/)
 - [Australian NDB Scheme (OAIC)](https://www.oaic.gov.au/privacy/notifiable-data-breaches)
 - [NIS2 Directive](https://digital-strategy.ec.europa.eu/en/policies/nis2-directive)
 - [DORA Regulation](https://www.digital-operational-resilience-act.com/)
@@ -990,7 +990,7 @@ Apply these tags to S3 buckets, DynamoDB tables, RDS instances, and other data s
 ### Privacy & Data Protection
 
 - [EDPB Guidelines on Personal Data Breach Notification](https://edpb.europa.eu/our-work-tools/our-documents/guidelines/guidelines-92022-personal-data-breach-notification-under_en)
-- [ICO Personal Data Breach Assessment Guidance](https://ico.org.uk/for-organizations/report-a-breach/personal-data-breach-assessment/)
+- [ICO Personal Data Breach Assessment Guidance](https://ico.org.uk/for-organisations/report-a-breach/personal-data-breach-assessment/)
 - [OAIC Data Breach Preparation and Response Guide](https://www.oaic.gov.au/privacy/guidance-and-advice/data-breach-preparation-and-response)
 - [Threat Technique Catalog for AWS](https://aws-samples.github.io/threat-technique-catalog-for-aws/)
 
