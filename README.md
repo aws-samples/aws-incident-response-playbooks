@@ -57,11 +57,11 @@ Incident response for Amazon Bedrock AgentCore — autonomous AI agents whose bl
 
 | Playbook | Description |
 |---|---|
-| [AgentCore Identity & Credential Compromise](playbooks/IRP-AgentCoreIdentityCompromise.md) | Stolen Cognito JWT, machine-client secret, workload-identity session, or Token Vault / OAuth2 / API-key credential-provider theft |
-| [AgentCore Agent Integrity](playbooks/IRP-AgentCoreAgentIntegrity.md) | Prompt injection, memory poisoning, poisoned Runtime artifact (S3 ZIP / ECR image), Registry supply-chain compromise |
-| [AgentCore Authorization Bypass](playbooks/IRP-AgentCoreAuthorizationBypass.md) | Cedar Policy Engine flipped ENFORCE → LOG_ONLY, rogue Gateway target, cross-account resource-based policy |
-| [AgentCore Tool Abuse](playbooks/IRP-AgentCoreToolAbuse.md) | Code Interpreter SSRF / exfiltration, Browser SSRF / saved-profile persistence, network-mode drift to PUBLIC |
-| [AgentCore Observability Tampering](playbooks/IRP-AgentCoreObservabilityTampering.md) | CloudTrail / Log Group / X-Ray / KMS tampering that blinds the investigator; Evaluations-role trace exfiltration |
+| [AgentCore Identity & Credential Compromise](playbooks/Amazon%20Bedrock%20AgentCore%20Playbooks/IRP-AgentCoreIdentityCompromise.md) | Stolen Cognito JWT, machine-client secret, workload-identity session, or Token Vault / OAuth2 / API-key credential-provider theft |
+| [AgentCore Agent Integrity](playbooks/Amazon%20Bedrock%20AgentCore%20Playbooks/IRP-AgentCoreAgentIntegrity.md) | Prompt injection, memory poisoning, poisoned Runtime artifact (S3 ZIP / ECR image), Registry supply-chain compromise |
+| [AgentCore Authorization Bypass](playbooks/Amazon%20Bedrock%20AgentCore%20Playbooks/IRP-AgentCoreAuthorizationBypass.md) | Cedar Policy Engine flipped ENFORCE → LOG_ONLY, rogue Gateway target, cross-account resource-based policy |
+| [AgentCore Tool Abuse](playbooks/Amazon%20Bedrock%20AgentCore%20Playbooks/IRP-AgentCoreToolAbuse.md) | Code Interpreter SSRF / exfiltration, Browser SSRF / saved-profile persistence, network-mode drift to PUBLIC |
+| [AgentCore Observability Tampering](playbooks/Amazon%20Bedrock%20AgentCore%20Playbooks/IRP-AgentCoreObservabilityTampering.md) | CloudTrail / Log Group / X-Ray / KMS tampering that blinds the investigator; Evaluations-role trace exfiltration |
 
 ### GuardDuty Finding Quick-Response Guides
 

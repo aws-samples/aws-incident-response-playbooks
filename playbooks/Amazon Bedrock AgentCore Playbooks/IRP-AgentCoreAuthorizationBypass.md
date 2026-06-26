@@ -35,8 +35,8 @@ List the detection signals that should route a responder to this playbook. Guard
 | CloudTrail | `UpdateGateway` with `requestParameters.policyEngineConfiguration.mode = LOG_ONLY` on a production gateway | — (treat as P1) |
 | CloudTrail | `CreateGatewayTarget` / `UpdateGatewayTarget` to a non-account Lambda ARN or a non-`*.amazonaws.com` URL | — |
 | CloudTrail | `PutResourcePolicy` referencing an AWS account outside your Organization, on a Runtime / Endpoint / Gateway / Memory | — (treat as P1) |
-| CloudTrail | `UpdateGateway` with a changed `authorizerType` (for example `CUSTOM_JWT` → `AWS_IAM`) | — |
-| CloudTrail | `CreatePolicy` whose `requestParameters.definition` Cedar statement begins with `permit(`, or `DeletePolicy` on a known `forbid` policy | — |
+| CloudTrail | `UpdateGateway` with a changed `authorizerType`. Valid values are `CUSTOM_JWT \| AWS_IAM \| NONE \| AUTHENTICATE_ONLY`; a flip to **`NONE` removes inbound authentication entirely — treat as P1**, the worst-case inbound bypass | — |
+| CloudTrail | `CreatePolicy` whose `requestParameters.definition` Cedar statement begins with `permit(`; `DeletePolicy` on a known `forbid` policy; or `UpdatePolicy` setting `requestParameters.enforcementMode = LOG_ONLY` on a `forbid` policy (neutralizes that policy without deleting it or touching the gateway) | — |
 | Amazon GuardDuty | `Discovery:IAMUser/AnomalousBehavior`, `CredentialAccess:IAMUser/AnomalousBehavior` on a principal that holds `bedrock-agentcore:*` | HIGH |
 | AWS Security Hub | Aggregated finding referencing an AgentCore Gateway or policy-engine resource ARN | CRITICAL/HIGH |
 | Custom / Third-Party | AWS Config rule flags a Gateway in `LOG_ONLY` mode or a resource policy with an external-account principal | — |
@@ -156,7 +156,7 @@ Collect and preserve the following **before taking any containment actions**. Ev
 | Current Gateway state `(mode, PE ARN, authorizerType)` per Gateway | `get-gateway` enumeration (below) | IR ticket / notes |
 | GuardDuty / Security Hub finding JSON | Console export | Forensic S3 |
 
-**The single most important query — surface Cedar enforcement-mode flips.** This is the highest-impact defense-evasion action in AgentCore and it is easy to miss: mode flips appear as `UpdateGateway` events carrying a `policyEngineConfiguration.mode` of `LOG_ONLY`, **not** as a dedicated policy API. The mode lives on the **Gateway** (`gateway.policyEngineConfiguration.mode`), not on the PolicyEngine, and `UpdatePolicyEngine` only changes the engine's description — it never appears here. Treat every match as a P1 indicator regardless of the calling principal.
+**The single most important query — surface Cedar enforcement-mode flips.** This is the highest-impact defense-evasion action in AgentCore and it is easy to miss: mode flips appear as `UpdateGateway` events carrying a `policyEngineConfiguration.mode` of `LOG_ONLY`, **not** as a dedicated policy API. The gateway-level enforcement mode lives on the **Gateway** (`gateway.policyEngineConfiguration.mode`), not on the PolicyEngine, and `UpdatePolicyEngine` only changes the engine's description — it never appears here. Treat every match as a P1 indicator regardless of the calling principal. **There is a second, finer-grained bypass:** each individual Cedar policy also carries a per-policy `enforcementMode` (`ACTIVE | LOG_ONLY`, default `ACTIVE`), set via `CreatePolicy` / `UpdatePolicy`. An attacker can neutralize a single `forbid` policy with `UpdatePolicy --enforcement-mode LOG_ONLY` — without flipping the gateway and without deleting the policy — so also hunt `UpdatePolicy` events with `requestParameters.enforcementMode = LOG_ONLY`.
 
 ```text
 fields @timestamp, eventName, userIdentity.arn, sourceIPAddress,
@@ -189,11 +189,11 @@ aws bedrock-agentcore-control list-policies --policy-engine-id "$POLICY_ENGINE_I
 
 **Additional evidence to collect** (full queries in **Appendix A**):
 
-- [ ] **PolicyEngine lifecycle events** (`CreatePolicyEngine`, `UpdatePolicyEngine`, `DeletePolicyEngine`). These never change mode, but if a PolicyEngine was **deleted** during the window, any Gateway that referenced it lost its authorization attachment entirely — confirm every Gateway's `policyEngineConfiguration` is intact.
+- [ ] **PolicyEngine lifecycle events** (`CreatePolicyEngine`, `UpdatePolicyEngine`, `DeletePolicyEngine`). These never change mode, but if a PolicyEngine was **deleted** during the window, any Gateway that referenced it lost its authorization attachment entirely — confirm every Gateway's `policyEngineConfiguration` is intact. Note `DeletePolicyEngine` requires **zero attached policies**, so an attacker must first delete every policy (visible as a burst of `DeletePolicy` events) before the engine can go — a standalone `DeletePolicyEngine` with no preceding `DeletePolicy` storm is implausible and suggests a different root cause.
 - [ ] **Cedar policy CRUD** (`CreatePolicy`, `UpdatePolicy`, `DeletePolicy`) plus natural-language authoring (`GeneratePolicy*`). Review `requestParameters.definition` on every match — a newly inserted policy whose Cedar statement starts with `permit(` is a candidate attacker-created bypass, and a deleted policy may be the `forbid` that blocked the action the attacker needed. AgentCore can translate plain-English descriptions into Cedar, so an attacker can author a bypass without knowing Cedar syntax.
 - [ ] **Gateway target changes** (`CreateGatewayTarget`, `UpdateGatewayTarget`, `DeleteGatewayTarget`). A target pointing at a cross-account Lambda (account ID not yours) or an external attacker-controlled URL is an exfiltration path that bypasses every downstream control. Inspect `requestParameters.targetConfiguration`.
 - [ ] **Resource-based policy changes** (`PutResourcePolicy`, `DeleteResourcePolicy`) on every Runtime, Runtime Endpoint, Gateway, and Memory. Resource-based policies grant access independently of customer IAM — flag any `PutResourcePolicy` whose document references an account ARN outside your Organization.
-- [ ] **Gateway authorizer changes.** Flipping `authorizerType` from `CUSTOM_JWT` to `AWS_IAM` widens inbound access to any IAM principal holding `bedrock-agentcore:InvokeGateway`, because `AWS_IAM` defers to standard IAM evaluation rather than JWT claim validation; flipping the other way may indicate the attacker loaded an OIDC discovery URL they control. Either direction warrants investigation.
+- [ ] **Gateway authorizer changes.** `authorizerType` has four valid values: `CUSTOM_JWT`, `AWS_IAM`, `NONE`, `AUTHENTICATE_ONLY`. A flip to **`NONE` removes inbound authentication entirely and is the most severe inbound-auth bypass — treat as P1.** Flipping `CUSTOM_JWT` → `AWS_IAM` widens inbound access to any IAM principal holding `bedrock-agentcore:InvokeGateway`, because `AWS_IAM` defers to standard IAM evaluation rather than JWT claim validation; flipping the other way may indicate the attacker loaded an OIDC discovery URL they control; `AUTHENTICATE_ONLY` authenticates without authorizing. Any change warrants investigation.
 - [ ] **`iam:PassRole` privilege-escalation pattern.** An attacker holding `bedrock-agentcore:CreateAgentRuntime` plus broad `iam:PassRole` can create a runtime that assumes an over-privileged role. Look for `CreateAgentRuntime` followed by `UpdateAgentRuntime` with a `roleArn` outside the approved set.
 - [ ] **Enumerate every Gateway target and every resource-based policy** to build the removal list for containment:
 
@@ -312,16 +312,18 @@ A Gateway in `LOG_ONLY` is an active-threat condition by definition — authoriz
      --gateway-identifier "$GATEWAY_ID" --target-id "$GATEWAY_TARGET_ID"
    ```
 
-4. **Delete every unauthorized resource-based policy.**
-   Cross-account Runtime access requires resource-based policies on **both** the runtime and the endpoint — delete both, or the surviving one keeps the access path open.
+4. **Delete every unauthorized resource-based policy on Runtimes and Gateways.**
+   **`DeleteResourcePolicy` supports AgentCore Runtime and Gateway only** (API reference: "currently available only for AgentCore Runtime and Gateway"). Endpoint and Memory resource policies **cannot** be deleted via this API — if the attacker attached a cross-account RBP to an Endpoint or Memory, capture it with `get-resource-policy` and neutralize it via an SCP `aws:PrincipalOrgID` deny + recreate the resource from IaC (it cannot be programmatically deleted). The endpoint ARN subpath, where you need it for `get-resource-policy`, is `runtime/<id>/endpoint/<endpoint-name>` per the dev guide.
 
    ```bash
+   # Deletable (Runtime + Gateway):
    aws bedrock-agentcore-control delete-resource-policy \
      --resource-arn "arn:aws:bedrock-agentcore:$AWS_REGION:$ACCOUNT_ID:runtime/<id>"
    aws bedrock-agentcore-control delete-resource-policy \
-     --resource-arn "arn:aws:bedrock-agentcore:$AWS_REGION:$ACCOUNT_ID:runtime/<id>/runtime-endpoint/<endpoint-name>"
-   aws bedrock-agentcore-control delete-resource-policy \
      --resource-arn "arn:aws:bedrock-agentcore:$AWS_REGION:$ACCOUNT_ID:gateway/<gid>"
+   # Endpoint/Memory RBPs are NOT deletable — capture for residual-risk handling:
+   aws bedrock-agentcore-control get-resource-policy \
+     --resource-arn "arn:aws:bedrock-agentcore:$AWS_REGION:$ACCOUNT_ID:runtime/<id>/endpoint/<endpoint-name>"
    ```
 
 5. **Revert any flipped Gateway authorizer.**
@@ -402,9 +404,16 @@ Use the evidence collected in Part 2 to trace the initial access vector and the 
 3. **Audit every `ALLOW` decision logged during the `LOG_ONLY` window.**
    Each `ALLOW` logged during LOG_ONLY is an action that was permitted **without enforcement**. Compare each against the restored policy set: any action that is `ALLOW` under LOG_ONLY but would be `DENY` under `ENFORCE` is a confirmed bypass and must be investigated individually — what data was read, what tool was invoked, what downstream system was reached.
 
+   This query runs against the `aws/spans` Transaction Search log group (the policy decision is an OTel span on the `AuthorizeAction` operation), **not** CloudTrail. The real span attributes are `aws.agentcore.policy.authorization_decision` / `.determining_policies` / `.target_resource.id` / `aws.agentcore.gateway.policy.mode` — there is no `principalId`/`actionId`/`resourceId`/`decision` field. The policy span has no principal id; join on `trace_id` to the `InvokeGateway` span to attribute the principal. If traces were not enabled, fall back to the `AllowDecisions`/`DenyDecisions` CloudWatch metrics and flag the evidence gap.
+
    ```text
-   fields @timestamp, principalId, actionId, resourceId, decision
-   | filter decision = "ALLOW"
+   # Log group: aws/spans
+   fields @timestamp, trace_id,
+          attributes.aws.agentcore.policy.authorization_decision,
+          attributes.aws.agentcore.policy.determining_policies,
+          attributes.aws.agentcore.policy.target_resource.id
+   | filter attributes.aws.agentcore.policy.authorization_decision = "ALLOW"
+       and attributes.aws.agentcore.gateway.policy.mode = "LOG_ONLY"
    | filter @timestamp >= <logOnly_start> and @timestamp <= <logOnly_end>
    ```
 
@@ -608,7 +617,8 @@ fields @timestamp, eventName, userIdentity.arn,
 ```
 
 ```text
--- Gateway authorizer-type changes (CUSTOM_JWT <-> AWS_IAM)
+-- Gateway authorizer-type changes (any of CUSTOM_JWT / AWS_IAM / NONE / AUTHENTICATE_ONLY;
+-- a flip to NONE removes inbound auth entirely — treat as P1)
 fields @timestamp, eventName, userIdentity.arn,
        requestParameters.gatewayIdentifier, requestParameters.authorizerType
 | filter eventSource = "bedrock-agentcore.amazonaws.com"
@@ -619,8 +629,16 @@ fields @timestamp, eventName, userIdentity.arn,
 
 ```text
 -- Cedar ALLOW decisions during a known LOG_ONLY window (confirmed-bypass candidates)
-fields @timestamp, principalId, actionId, resourceId, decision
-| filter decision = "ALLOW"
+-- Log group: aws/spans (OTel AuthorizeAction span) — NOT CloudTrail.
+-- Real attributes: aws.agentcore.policy.authorization_decision / .determining_policies
+-- / .target_resource.id / aws.agentcore.gateway.policy.mode. No principalId/decision field;
+-- join on trace_id to the InvokeGateway span for principal attribution.
+fields @timestamp, trace_id,
+       attributes.aws.agentcore.policy.authorization_decision,
+       attributes.aws.agentcore.policy.determining_policies,
+       attributes.aws.agentcore.policy.target_resource.id
+| filter attributes.aws.agentcore.policy.authorization_decision = "ALLOW"
+    and attributes.aws.agentcore.gateway.policy.mode = "LOG_ONLY"
 | filter @timestamp >= <logOnly_start> and @timestamp <= <logOnly_end>
 ```
 
@@ -647,7 +665,7 @@ aws guardduty get-findings \
 
 > `[Legal / Compliance]` owns this section during an active incident.
 
-See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
+See [Regulatory Context](../../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
 
 An authorization bypass is especially significant for notification analysis because, during the `LOG_ONLY` window, an agent may have read Memory records (conversation content, PII), retrieved Token Vault credentials, or reached customer-facing tools with no enforcement — any of which can trigger obligations. Determine data-subject impact early (Part 2, by auditing the `ALLOW` decisions logged during the window), since that determines which regulations apply.
 

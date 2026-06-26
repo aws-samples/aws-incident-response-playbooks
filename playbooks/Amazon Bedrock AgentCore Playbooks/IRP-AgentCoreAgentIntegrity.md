@@ -615,7 +615,7 @@ aws guardduty get-findings \
 
 > `[Legal / Compliance]` owns this section during an active incident.
 
-See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
+See [Regulatory Context](../../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
 
 Agent-integrity incidents frequently involve Memory records (conversation content, PII), manipulated agent output returned to end users, and — in the stream-exfiltration case — bulk transfer of memory contents to an attacker-controlled destination. Any of these can trigger notification obligations. Determine data-subject impact early (Part 2): are conversation histories or Memory records associated with identifiable users, and did the agent return manipulated responses to users during the incident window?
 

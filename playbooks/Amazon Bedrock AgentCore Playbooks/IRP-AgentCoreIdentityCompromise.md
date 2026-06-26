@@ -35,7 +35,8 @@ List the detection signals that should route a responder to this playbook.
 | Amazon GuardDuty | `CredentialAccess:IAMUser/AnomalousBehavior`, `Discovery:IAMUser/AnomalousBehavior`, `Impact:IAMUser/AnomalousBehavior` on an AgentCore principal | HIGH |
 | AWS Security Hub | Aggregated finding referencing an AgentCore workload-identity or credential-provider resource ARN | CRITICAL / HIGH |
 | CloudTrail | `CreateWorkloadIdentity`, `CreateOauth2CredentialProvider`, `CreateApiKeyCredentialProvider`, or `SetTokenVaultCMK` from an unexpected principal | — |
-| CloudTrail | `InitiateAuth` / `AdminInitiateAuth` / `RespondToAuthChallenge` from an unexpected source IP; `AdminSetUserPassword`, `ConfirmForgotPassword` during an incident window | — |
+| CloudTrail | (human-auth vectors only) `InitiateAuth` / `AdminInitiateAuth` / `RespondToAuthChallenge` from an unexpected source IP; `AdminSetUserPassword`, `ConfirmForgotPassword` during an incident window | — |
+| ALB / CloudFront / WAF access log | Request-rate spike on the hosted-domain `/oauth2/token` path for one confidential App Client — the **only** signal for M2M (`client_credentials`) secret compromise; it emits no `cognito-idp` CloudTrail event | — |
 | CloudWatch | Alarm on `GetResourceOauth2Token` / `GetResourceApiKey` / `GetWorkloadAccessToken*` volume deviation per principal | — |
 | Custom / Third-Party | External OAuth provider (GitHub, Salesforce, Slack, Okta, Microsoft Entra) reports anomalous API use by the client tied to an AgentCore credential provider | — |
 
@@ -111,7 +112,7 @@ Detection → IR Lead notified → Severity assessed → P1/P2: AWS CIRT engaged
 This playbook should be exercised before it is needed. Recommended testing cadence: **annually at minimum, semi-annually for P1 scenarios.**
 
 Suggested tabletop scenario for this incident type:
-> "At 02:00 UTC a workload identity that did not exist an hour ago begins issuing a burst of `GetResourceOauth2Token` calls from a single external IP, and a confidential Cognito App Client shows a rising rate of `RespondToAuthChallenge`. Walk the team from detection, through distinguishing a stolen JWT from a machine-client secret compromise, to Token-Vault and external-provider revocation — including who files the GitHub/Okta audit-log request and how the credential chain is walked to closure."
+> "At 02:00 UTC a workload identity that did not exist an hour ago begins issuing a burst of `GetResourceOauth2Token` calls from a single external IP, and the ALB access logs for a confidential App Client show a rising request rate against the `/oauth2/token` path. Walk the team from detection, through distinguishing a stolen JWT from a machine-client secret compromise, to Token-Vault and external-provider revocation — including who files the GitHub/Okta audit-log request and how the credential chain is walked to closure."
 
 Reference: [AWS Security Incident Response Game Days](https://docs.aws.amazon.com/security-ir/latest/userguide/game-days.html)
 
@@ -159,7 +160,7 @@ Collect and preserve the following **before taking any containment actions**. Ev
 
 3. **Hunt token-vending anomalies.** Spikes in `GetWorkloadAccessToken*`, `GetResourceOauth2Token`, or `GetResourceApiKey` volume, unexpected source IPs, or calls against credential providers the principal does not normally use indicate a compromised credential harvesting secondary credentials from the Token Vault. Treat unusual `GetResourceOauth2Token` / `GetResourceApiKey` volume as evidence that external services may already be compromised through tokens vended before you discovered the incident.
 
-4. **Analyze Cognito authentication.** A stolen JWT replay shows as `REFRESH_TOKEN_AUTH` calls with no preceding `InitiateAuth`. A machine-client secret compromise shows as a high-rate `InitiateAuth` / `RespondToAuthChallenge` pair (client-credentials flow) against a single confidential App Client. Credential stuffing shows as many `InitiateAuth` calls returning `UserNotFoundException` / `NotAuthorizedException` across many usernames from one IP. Also pull `ForgotPassword`, `ConfirmForgotPassword`, `AdminSetUserPassword`, `SignUp`, `ConfirmSignUp`, `AdminRespondToAuthChallenge`, `AdminAddUserToGroup`, `CreateUserPoolClient`, and `UpdateUserPoolClient` during the window — each is a distinct persistence mechanism that survives JWT revocation and global sign-out (Appendix A queries).
+4. **Analyze Cognito authentication.** A stolen JWT replay shows as `REFRESH_TOKEN_AUTH` calls with no preceding `InitiateAuth`. Credential stuffing shows as many `InitiateAuth` calls returning `UserNotFoundException` / `NotAuthorizedException` across many usernames from one IP. **Machine-client (M2M) secret compromise does not appear in `cognito-idp` CloudTrail at all** — the OAuth2 `client_credentials` grant is served by the hosted-domain `/oauth2/token` endpoint, not the `InitiateAuth` / `RespondToAuthChallenge` API (`CLIENT_CREDENTIALS` is not a valid `InitiateAuth` AuthFlow). Detect M2M-secret abuse from the ALB/CloudFront/WAF access logs for the `/oauth2/token` path (request-rate spike against one confidential App Client) and from downstream Gateway/Runtime data events keyed on the JWT `client_id`/`sub`, not from Cognito API events. Also pull `ForgotPassword`, `ConfirmForgotPassword`, `AdminSetUserPassword`, `SignUp`, `ConfirmSignUp`, `AdminRespondToAuthChallenge`, `AdminAddUserToGroup`, `CreateUserPoolClient`, and `UpdateUserPoolClient` during the window — each is a distinct persistence mechanism that survives JWT revocation and global sign-out (Appendix A queries).
 
 5. **Review GuardDuty IAM findings** for the suspect principal — `UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration.OutsideAWS`, `CredentialAccess:IAMUser/AnomalousBehavior`, `Discovery:IAMUser/AnomalousBehavior`, or `Impact:IAMUser/AnomalousBehavior` frequently correlate with AgentCore credential compromise. Filter by resource ARNs containing `bedrock-agentcore` or by the suspect principal ARN.
 
@@ -240,8 +241,9 @@ Is containment action required immediately?
 
 **Step-by-step containment for this incident type:**
 
-1. **Revoke active IAM sessions for the compromised principal.**
-   Attach an inline deny policy conditioned on `aws:TokenIssueTime` less than the current timestamp. This invalidates every session issued before now without affecting future sessions, so legitimate automation can resume cleanly after credentials are rotated.
+1. **Revoke the compromised principal's credentials — branch by `userIdentity.type`.**
+
+   **For a temporary / assumed-role session (`AssumedRole`, federated):** attach an inline deny policy conditioned on `aws:TokenIssueTime` less than the current timestamp. This invalidates every session issued before now without affecting future sessions, so legitimate automation can resume cleanly after credentials are rotated. **This condition key applies only to temporary credentials** — it is a **no-op against a long-term IAM-user access key** (`aws:TokenIssueTime` is absent from the request context for long-term keys), so do not rely on it for a stolen `AKIA…` key.
 
    ```bash
    REVOKE_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -252,6 +254,13 @@ Is containment action required immediately?
    aws iam put-role-policy --role-name <ROLE_NAME> \
      --policy-name RevokeOldSessions-<INCIDENT_ID> \
      --policy-document file:///tmp/revoke-sessions.json
+   ```
+
+   **For a stolen long-term IAM-user access key (`userIdentity.type = IAMUser`):** deactivate the key immediately — this is the only action that stops a long-term key. Preserve it (deactivate, don't delete) for forensics; delete it in eradication (§ 4.2).
+
+   ```bash
+   aws iam update-access-key --user-name <USER_NAME> \
+     --access-key-id <AKIA...> --status Inactive
    ```
 
 2. **Disable the compromised Cognito user and force a global sign-out.**
@@ -281,7 +290,7 @@ Is containment action required immediately?
    ```
 
 4. **Delete every rogue workload identity created by the suspect principal.**
-   Workload identities vend scoped credentials to agents and MCP servers, so an attacker-created workload identity is an ongoing credential-minting path that must be removed even after the parent credential is revoked. The delete parameter is `--name`, not `--workload-identity-id`.
+   Workload identities vend scoped credentials to agents and MCP servers, so an attacker-created workload identity is an ongoing credential-minting path that must be removed even after the parent credential is revoked. The delete parameter is `--name`, not `--workload-identity-id`. **`DeleteWorkloadIdentity` stops future minting but does not invalidate workload access tokens already vended** — those remain valid to their natural TTL (the same caveat as external OAuth tokens, step 6). Pair deletion with rotating the downstream resource credentials those tokens can reach; deleting the identity alone does not revoke an already-issued token.
 
    > **Paginate.** The `list-*` commands in this step (and `list-user-pool-clients` above) cap each page at `--max-results`; an account with more resources than the page size returns a `nextToken` you must follow, or you will miss attacker-created identities. Loop until the token is empty, e.g.: `T=""; while :; do OUT=$(aws bedrock-agentcore-control list-workload-identities --max-results 20 ${T:+--next-token "$T"}); echo "$OUT" | jq -r '.workloadIdentities[].name'; T=$(echo "$OUT" | jq -r '.nextToken // empty'); [ -z "$T" ] && break; done`
 
@@ -567,7 +576,7 @@ fields @timestamp, eventName, userIdentity.arn, sourceIPAddress,
 | sort @timestamp asc
 ```
 
-> Auth-flow interpretation: a stolen-JWT replay shows as `REFRESH_TOKEN_AUTH` with no preceding `InitiateAuth`; a machine-client secret compromise shows as high-rate `InitiateAuth`/`RespondToAuthChallenge` (client-credentials) against one confidential App Client; credential stuffing shows as many `InitiateAuth` calls with `UserNotFoundException` / `NotAuthorizedException` across many usernames from one IP.
+> Auth-flow interpretation: a stolen-JWT replay shows as `REFRESH_TOKEN_AUTH` with no preceding `InitiateAuth`; credential stuffing shows as many `InitiateAuth` calls with `UserNotFoundException` / `NotAuthorizedException` across many usernames from one IP. A machine-client (M2M) secret compromise does **not** appear in this `cognito-idp` query — the `client_credentials` grant hits the hosted-domain `/oauth2/token` endpoint (not `InitiateAuth`; `CLIENT_CREDENTIALS` is not a valid AuthFlow), so detect it from ALB/CloudFront/WAF `/oauth2/token` access logs and downstream Gateway/Runtime data events keyed on the JWT `client_id`.
 
 ### Bedrock model-abuse hunt (multi-region)
 
@@ -618,7 +627,7 @@ Revocation of the AgentCore-side credential does not tell you what tokens alread
 
 > `[Legal / Compliance]` owns this section during an active incident.
 
-See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
+See [Regulatory Context](../../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
 
 **Quick reference for this scenario:** Identity & credential compromise frequently exposes Token Vault credentials for external services and may give the attacker access to Memory records (conversation content, PII) and customer-facing agent output — any of which can trigger notification obligations.
 

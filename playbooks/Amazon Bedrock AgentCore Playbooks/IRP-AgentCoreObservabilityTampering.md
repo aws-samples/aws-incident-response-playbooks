@@ -644,7 +644,7 @@ aws cloudtrail validate-logs --trail-arn "$TRAIL_ARN" \
 
 > `[Legal / Compliance]` owns this section during an active incident.
 
-See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
+See [Regulatory Context](../../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
 
 Observability tampering carries a distinctive regulatory posture: because the evidence base was deliberately degraded, you may be **unable to prove** that personal data was *not* accessed during the blindspot window. Many regimes treat an inability to rule out access — combined with confirmed defense evasion — as sufficient to trigger notification. Determine the data classification of records reachable during the blindspot window (Memory conversation content/PII, Token Vault credentials, Evaluations spans that may contain sampled response content) early, and consult Legal before concluding "no notifiable impact."
 

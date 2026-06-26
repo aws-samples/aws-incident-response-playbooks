@@ -14,7 +14,7 @@
 
 ## Overview
 
-Amazon Bedrock AgentCore Tool Abuse occurs when an attacker — often by way of prompt injection or a compromised inbound identity — drives an agent's sandboxed tools (Code Interpreter and Browser) to act against your environment rather than on the user's behalf. Code Interpreter runs sandboxed Python/TypeScript/JavaScript inside an ephemeral Firecracker microVM and can be abused for server-side request forgery (SSRF) against internal endpoints, reconnaissance of the execution environment, or exfiltration over HTTP or DNS. Browser is headless Chromium automation and can be abused for SSRF to internal URLs, for saved-Profile cookie persistence that survives session termination, and for Web Bot Auth signing-key misuse against external WAFs. Both tools enforce **zero data retention** — the moment a session stops, the microVM is destroyed and its contents are unrecoverable — so evidence of what the attacker did inside a session must be captured *live* before any stop action. This scenario also covers persistent WebSocket/AGUI streaming connections that outlive API-level containment, and network-mode drift (SANDBOX/VPC → PUBLIC) that quietly removes egress restrictions.
+Amazon Bedrock AgentCore Tool Abuse occurs when an attacker — often by way of prompt injection or a compromised inbound identity — drives an agent's sandboxed tools (Code Interpreter and Browser) to act against your environment rather than on the user's behalf. Code Interpreter runs sandboxed Python/TypeScript/JavaScript inside an ephemeral Firecracker microVM and can be abused for server-side request forgery (SSRF) against internal endpoints, reconnaissance of the execution environment, or exfiltration over HTTP or DNS. Browser is headless Chromium automation and can be abused for SSRF to internal URLs, for saved-Profile cookie persistence that survives session termination, and for Web Bot Auth signing-key misuse against external WAFs. Both tools enforce **zero data retention** — the moment a session stops, the microVM is destroyed and its contents are unrecoverable — so evidence of what the attacker did inside a session must be captured *live* before any stop action. This scenario also covers persistent WebSocket/AGUI streaming connections that outlive API-level containment, and network-mode drift to PUBLIC that quietly removes egress restrictions (Code Interpreter SANDBOX/VPC → PUBLIC; Browser VPC → PUBLIC — Browser has no SANDBOX mode).
 
 ### Out of Scope
 
@@ -160,7 +160,8 @@ Save all evidence to the forensic S3 bucket with Object Lock in COMPLIANCE mode 
 
 - **Code Interpreter activity.** The data-plane event for code execution is `InvokeCodeInterpreter` (action and session live in `requestParameters`); lifecycle events are `StartCodeInterpreterSession` / `StopCodeInterpreterSession`. An invocation spike from one principal, sessions that outlast their normal duration, or invocations from never-before-seen IPs all indicate the sandbox is being used for reconnaissance or exfiltration rather than legitimate reasoning.
 - **Browser activity and streaming connections.** Browser interaction spans three data-plane actions. `ConnectBrowserAutomationStream` establishes the Chrome DevTools Protocol (CDP) automation stream — page navigation runs over this stream, with the target URL passed inside the call rather than as a separate event name. `InvokeBrowser` is a **separate, standalone action** that performs OS-level browser actions (mouse clicks, keyboard input, screenshots, and dialogs that CDP cannot reach, such as print and JavaScript-alert dialogs) against an active session identified by `browserIdentifier` + `sessionId` — do not assume browser activity is visible only through the automation stream. `ConnectBrowserLiveViewStream` is the live-view stream. All three can establish or drive sessions that outlive the client's view. `SaveBrowserSessionProfile` captures cookies, localStorage, and sessionStorage into a Browser Profile (also creatable via the control-plane `CreateBrowserProfile`) that persists across sessions — saving a profile after authenticating to an external service establishes authenticated-session persistence that survives the session's termination.
-- **Persistent WebSocket / AGUI streams.** `InvokeAgentRuntimeWithWebSocketStream` establishes bidirectional WebSocket connections that persist after an SCP or IAM block until the underlying TCP connection closes — API-level denial does **not** immediately terminate the stream. When a call carries the `X-Amzn-Bedrock-AgentCore-Runtime-User-Id` header, AgentCore requires **both** `bedrock-agentcore:InvokeAgentRuntime` **and** the separate `bedrock-agentcore:InvokeAgentRuntimeForUser` action — a deny that omits `InvokeAgentRuntimeForUser` leaves the on-behalf-of-user invocation path open, so any deny set must include it.
+- **Persistent WebSocket / AGUI streams.** `InvokeAgentRuntimeWithWebSocketStream` (and its on-behalf-of-user variant `InvokeAgentRuntimeWithWebSocketStreamForUser`) establishes bidirectional WebSocket connections that persist after an SCP or IAM block until the underlying TCP connection closes — API-level denial does **not** immediately terminate the stream. When a call carries the `X-Amzn-Bedrock-AgentCore-Runtime-User-Id` header, AgentCore requires **both** `bedrock-agentcore:InvokeAgentRuntime` **and** the separate `bedrock-agentcore:InvokeAgentRuntimeForUser` action — a deny that omits `InvokeAgentRuntimeForUser` leaves the on-behalf-of-user invocation path open, so any deny set must include it.
+- **Interactive command shell.** `InvokeAgentRuntimeCommand` and `InvokeAgentRuntimeCommandShell` invoke commands / an interactive command shell on a Runtime endpoint (the shell runs over a WebSocket stream). This is the most direct hands-on-keyboard execution surface in AgentCore — like the WebSocket streams, an established shell survives API-level denial until the TCP connection closes, so containment requires endpoint deletion plus a VPC NACL deny, not just an SCP. Hunt for these actions and include them in the §3.2 deny set.
 - **Network-mode drift.** Code Interpreter supports three network modes: PUBLIC (unrestricted outbound), SANDBOX (S3 and DNS only), and VPC (customer-controlled). The mode is **immutable** once created — there is no `UpdateCodeInterpreter` or `UpdateBrowser` API — so an attacker downgrading SANDBOX/VPC to PUBLIC must `Delete` then `Create`. A `DeleteCodeInterpreter` followed by a `CreateCodeInterpreter` whose `networkConfiguration.networkMode` differs from the IaC baseline (apply the same pattern to `DeleteBrowser`/`CreateBrowser`) must be investigated before containment.
 - **VPC egress (VPC-mode only).** Enumerate the relevant ENIs (`aws ec2 describe-network-interfaces --filters Name=description,Values="*bedrock-agentcore*"`), then query Flow Logs for ACCEPT entries to non-RFC1918 destinations. **PUBLIC-mode and SANDBOX-mode resources produce no flow-log visibility at all** — for those modes detection relies on Route 53 Resolver DNS query logs and application-layer logs only.
 - **DNS exfiltration.** Query Route 53 Resolver DNS logs for queries to non-AWS domains. SANDBOX mode permits DNS resolution (so agents can reach S3 via DNS), which makes DNS a working exfiltration channel. A cluster of queries to a newly-registered domain, a dynamic-DNS provider, or a domain matching no allowlisted service is evidence of DNS-encoded exfiltration.
@@ -269,6 +270,9 @@ Is containment action required immediately?
        "bedrock-agentcore:InvokeAgentRuntime",
        "bedrock-agentcore:InvokeAgentRuntimeForUser",
        "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream",
+       "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStreamForUser",
+       "bedrock-agentcore:InvokeAgentRuntimeCommand",
+       "bedrock-agentcore:InvokeAgentRuntimeCommandShell",
        "bedrock-agentcore:ConnectBrowserAutomationStream",
        "bedrock-agentcore:ConnectBrowserLiveViewStream",
        "bedrock-agentcore:InvokeBrowser"
@@ -277,6 +281,8 @@ Is containment action required immediately?
      "Condition": { "StringNotEquals": { "aws:PrincipalArn": "<IR role ARN>" } }
    }
    ```
+
+   > **Action-coverage notes.** `InvokeAgentRuntimeCommand` / `InvokeAgentRuntimeCommandShell` are the interactive command / command-shell surfaces (the shell runs over a WebSocket stream) — without them in the deny set an attacker keeps a hands-on-keyboard execution path after the block; `InvokeAgentRuntimeWithWebSocketStreamForUser` is the on-behalf-of-user variant of the WebSocket stream and must be denied alongside `InvokeAgentRuntimeWithWebSocketStream`. `InvokeBrowser` is a confirmed live operation but, as of 2026-06, is not yet enumerated in the IAM service-authorization reference — verify the `bedrock-agentcore:InvokeBrowser` action string resolves in your account before relying on this deny to block it (if it does not yet, scope containment via `StartBrowserSession`/session-stop instead).
 
 4. **Break established WebSocket and AGUI streams at the network layer**
    SCP-based denial only blocks *new* API calls — existing TCP connections persist until one side closes. Deleting the Runtime endpoint forces closure of established streams by removing the endpoint they are connected to. The CLI parameter is `--endpoint-name`, **not** `--endpoint-identifier`. For persistent external connections from VPC-mode resources, also apply a VPC NACL deny rule — NACLs are stateless and immediately drop packets on established connections.
@@ -296,7 +302,7 @@ Is containment action required immediately?
    ```
 
 5. **Revert any network-mode drift**
-   If an attacker changed Code Interpreter or Browser from SANDBOX or VPC to PUBLIC, revert to the IaC-known-good mode. AgentCore exposes **no update API** for Code Interpreter or Browser — `networkConfiguration` is immutable once the tool is created. To revert, delete the tool resource and recreate it from IaC with the correct `networkConfiguration`. Active sessions must be stopped first (step 1) because the tool cannot be deleted with active sessions.
+   If an attacker changed Code Interpreter from SANDBOX or VPC, or Browser from VPC, to PUBLIC, revert to the IaC-known-good mode. (Code Interpreter supports `PUBLIC | SANDBOX | VPC`; **Browser supports only `PUBLIC | VPC`** — there is no Browser SANDBOX mode, so the only non-public Browser option is VPC.) AgentCore exposes **no update API** for Code Interpreter or Browser — `networkConfiguration` is immutable once the tool is created. To revert, delete the tool resource and recreate it from IaC with the correct `networkConfiguration`. Active sessions must be stopped first (step 1) because the tool cannot be deleted with active sessions.
 
    ```bash
    # Delete the tool with the drifted network mode (requires no active sessions)
@@ -363,7 +369,7 @@ Use the evidence collected in Part 2 (execution-role CloudTrail timeline, OTel r
 > `[IR Lead]` coordinates. `[Account / Agent Owner]` approves changes to production resources.
 
 1. **Rebuild Code Interpreter and Browser resources from IaC with hardened configuration**
-   Pin `networkMode` to SANDBOX or VPC (never PUBLIC in production). Scope the execution role to the minimum required permissions — do not grant `bedrock:InvokeModel*` to the sandbox execution role unless the agent specifically needs model access from inside the sandbox, and never grant broad Secrets Manager or S3 access. Do **not** restore saved Browser Profiles that existed during the incident window.
+   Pin `networkMode` away from PUBLIC: Code Interpreter to SANDBOX or VPC, and Browser to VPC (Browser has no SANDBOX mode). Scope the execution role to the minimum required permissions — do not grant `bedrock:InvokeModel*` to the sandbox execution role unless the agent specifically needs model access from inside the sandbox, and never grant broad Secrets Manager or S3 access. Do **not** restore saved Browser Profiles that existed during the incident window.
 
 2. **Audit every sandbox execution role**
    The MMDS exposes the execution role's credentials to any code that runs in the sandbox, so an over-privileged execution role is a privilege-escalation launchpad. Enumerate roles whose names indicate sandbox attachment (`agentcore` plus `tool`, `ci`, or `browser`) and review every attached and inline policy. Remove anything not strictly required.
@@ -395,7 +401,7 @@ Use the evidence collected in Part 2 (execution-role CloudTrail timeline, OTel r
 ### 4.3 Recovery Actions
 
 1. **Restore from known-good state**
-   For sandbox tools (stateless), the restore point is your last known-good IaC commit hash. Redeploy Code Interpreter and Browser from IaC with the hardened configuration from the eradication phase. Confirm every resource's network mode is SANDBOX or VPC and that no PUBLIC-mode resource exists in production. Do not restore saved Browser Profiles that existed during the incident window.
+   For sandbox tools (stateless), the restore point is your last known-good IaC commit hash. Redeploy Code Interpreter and Browser from IaC with the hardened configuration from the eradication phase. Confirm no PUBLIC-mode resource exists in production — Code Interpreter resources should be SANDBOX or VPC, Browser resources VPC (Browser has no SANDBOX mode). Do not restore saved Browser Profiles that existed during the incident window.
 
 2. **Re-enable services and access**
    - [ ] Remove the sandbox-session deny SCP (containment step 3) **only after** sandbox sessions succeed with the restricted scope — tool abuse should be blocked while new, hardened sessions succeed
@@ -533,13 +539,16 @@ fields @timestamp, eventName, userIdentity.arn, requestParameters.networkConfigu
 | sort @timestamp desc
 ```
 
-### Persistent WebSocket / AGUI streams
+### Persistent WebSocket / AGUI streams and interactive command shells
 
 ```text
 fields @timestamp, eventName, userIdentity.arn, sourceIPAddress
 | filter eventSource = "bedrock-agentcore.amazonaws.com"
 | filter eventName in [
-    "InvokeAgentRuntimeWithWebSocketStream"
+    "InvokeAgentRuntimeWithWebSocketStream",
+    "InvokeAgentRuntimeWithWebSocketStreamForUser",
+    "InvokeAgentRuntimeCommand",
+    "InvokeAgentRuntimeCommandShell"
   ]
 | sort @timestamp desc
 ```
@@ -615,7 +624,7 @@ aws guardduty get-findings \
 
 > `[Legal / Compliance]` owns this section during an active incident.
 
-See [Regulatory Context](../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
+See [Regulatory Context](../../REGULATORY_CONTEXT.md) for the full notification obligation matrix by regulation and incident type.
 
 Tool-abuse incidents can carry data-impact even when the blast radius looks technical: a Code Interpreter exfiltration channel may have moved Memory contents, conversation history, or files staged in the sandbox out of the environment; a Browser SSRF or saved-Profile session may have read internal data or acted as an authenticated user against a third-party service. Determine data-subject impact early (Part 2) — whether conversation histories or sandbox-staged data are associated with identifiable users drives the downstream obligations below.
 
