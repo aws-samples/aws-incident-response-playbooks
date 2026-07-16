@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| **Playbook Version** | 1.0 |
-| **Last Reviewed** | 2026-06-25 |
-| **Status** | Draft |
+| **Playbook Version** | 1.3 |
+| **Last Reviewed** | 2026-07-15 |
+| **Status** | Released |
 | **NIST Framework** | SP 800-61r3 (CSF 2.0 Community Profile) |
 | **Related Playbooks** | IRP-CredCompromise |
 
@@ -16,6 +16,8 @@
 
 This playbook addresses incident response for satellite operations running on AWS, covering both the ground segment (mission control, ground stations, data processing pipelines) and the operational interfaces to space assets. Satellite operations present unique IR challenges: limited contact windows (typically 8 minutes per 90-minute orbit for LEO spacecraft), bandwidth-constrained command uplinks, irreversible consequences of certain space commands, and the difficulty of distinguishing cyber incidents from environmental anomalies such as single-event upsets (SEUs) caused by radiation. This playbook provides a structured approach to detecting, containing, eradicating, and recovering from security incidents across the full satellite operations stack on AWS, aligned with NIST SP 800-61r3 and sector-specific requirements including Space Policy Directive 5 (SPD-5) and NIS2.
 
+This playbook operationalizes the guidance in the two-part AWS blog series on satellite incident response: [Part 1: Detection and Forensic Readiness](https://aws.amazon.com/blogs/publicsector/an-incident-response-playbook-for-satellite-operations-on-aws-part-1-detection-and-forensic-readiness/) and [Part 2: Automated Response and Recovery](https://aws.amazon.com/blogs/publicsector/an-incident-response-playbook-for-satellite-operations-on-aws-part-2-automated-response-and-recovery/). Refer to those posts for the narrative context and design rationale behind the steps below.
+
 ---
 
 ## Applicable Finding Types
@@ -24,10 +26,9 @@ The detection signals that should route a responder to this playbook:
 
 | Source | Finding / Event Type | Severity |
 | --- | --- | --- |
-| Amazon GuardDuty | Unusual Ground Station API calls (such as `ReserveContact` from unexpected source) | HIGH |
-| Amazon GuardDuty | Compromised IAM credentials with Ground Station permissions | HIGH |
-| Amazon GuardDuty | `DeleteDataflowEndpointGroup` outside maintenance windows | HIGH |
-| AWS CloudTrail / CloudTrail Insights | Unusual Ground Station API call patterns | MEDIUM |
+| Amazon GuardDuty | `UnauthorizedAccess:IAMUser/MaliciousIPCaller` - API call to Ground Station resources from a known malicious IP | HIGH |
+| Amazon GuardDuty | `CredentialAccess:IAMUser/AnomalousBehavior` - anomalous activity from IAM credentials with Ground Station permissions | HIGH |
+| AWS CloudTrail Insights | Anomalous Ground Station API call rate (such as `ReserveContact` from an unexpected source, or `DeleteDataflowEndpointGroup` outside maintenance windows) | HIGH |
 | Amazon CloudWatch | Anomaly detection alarm: telemetry outside expected thresholds with no environmental correlation | MEDIUM |
 | Custom / Application | Unexpected command acknowledgments (commands your system did not send) | CRITICAL |
 | Custom / Application | Telemetry values deviating from predicted orbital mechanics or thermal models | MEDIUM |
@@ -80,7 +81,7 @@ Confirm the following are enabled and configured in all applicable accounts and 
 
 Ensure the following access is pre-provisioned and tested. Do not provision break-glass access during an active incident.
 
-- [ ] Break-glass IAM role with least-privilege IR permissions exists, documented, and tested quarterly
+- [ ] [Break-glass IAM role](https://docs.aws.amazon.com/wellarchitected/latest/devops-guidance/ag.sad.5-implement-break-glass-procedures.html) with least-privilege IR permissions exists, documented, and tested quarterly
 - [ ] IR team members can assume the break-glass role with MFA
 - [ ] Access to AWS Security Incident Response console (if subscribed) is confirmed
 - [ ] Forensic account (isolated, no connectivity to production ground segment) is available for evidence preservation
@@ -298,10 +299,7 @@ After recovery, configure CloudWatch anomaly detection on additional telemetry m
 
 ```bash
 aws cloudwatch put-anomaly-detector \
-  --namespace "SatelliteOps/Telemetry" \
-  --metric-name "SignalToNoiseRatio" \
-  --stat "Average" \
-  --dimensions Name=SatelliteId,Value=SAT-001 \
+  --single-metric-anomaly-detector 'Namespace=SatelliteOps/Telemetry,MetricName=SignalToNoiseRatio,Stat=Average,Dimensions=[{Name=SatelliteId,Value=SAT-001}]' \
   --configuration '{
     "ExcludedTimeRanges": [],
     "MetricTimezone": "UTC"
@@ -330,8 +328,7 @@ The `ANOMALY_DETECTION_BAND(m1, 2)` expression uses a band width of 2 standard d
 
 ```bash
 aws cloudwatch delete-anomaly-detector \
-  --single-metric-anomaly-detector \
-    Namespace="SatelliteOps/Telemetry",MetricName="SignalToNoiseRatio",Stat="Average",Dimensions=[{Name=SatelliteId,Value=SAT-001}]
+  --single-metric-anomaly-detector 'Namespace=SatelliteOps/Telemetry,MetricName=SignalToNoiseRatio,Stat=Average,Dimensions=[{Name=SatelliteId,Value=SAT-001}]'
 
 aws cloudwatch delete-alarms \
   --alarm-names "SAT-001-SNR-Anomaly"
@@ -461,4 +458,7 @@ Use the AWS Ground Station digital twin to validate that your scheduling and con
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 1.0 | 2026-06-25 | Harshvardhan Chunawala | Initial draft |
+| 1.1 | 2026-06-25 | Harshvardhan Chunawala | Initial release |
+| 1.2 | 2026-07-14 | Harshvardhan Chunawala | Corrected detection signal mappings and CloudWatch CLI syntax |
+| 1.3 | 2026-07-15 | Harshvardhan Chunawala | Expanded Overview with supporting AWS guidance |
 
