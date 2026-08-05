@@ -20,9 +20,9 @@ IAM credential compromise occurs when an unauthorized party obtains valid AWS cr
 
 This playbook does **not** cover:
 
-- **STS temporary credential abuse via AssumeRole chains** — If the primary vector is cross-account role assumption or session token manipulation without initial long-term credential theft, see [IRP-STSTokenAbuse](IRP-STSTokenAbuse.md). (Coming Soon)
-- **Identity Center (SSO) compromise** — If the compromise involves AWS Identity Center permission sets or SSO sessions, see [IRP-IdentityCenterCompromise](IRP-IdentityCenterCompromise.md). (Coming Soon)
-- **Federated identity / IdP compromise** — If the initial compromise is at the identity provider level (Okta, Azure AD, etc.) leading to AWS access, see [IRP-FederatedAccessAbuse](IRP-FederatedAccessAbuse.md). (Coming Soon)
+- **STS temporary credential abuse via AssumeRole chains** — If the primary vector is cross-account role assumption or session token manipulation without initial long-term credential theft, see [IRP-STSTokenAbuse](IRP-STSTokenAbuse.md).
+- **Identity Center (SSO) compromise** — If the compromise involves AWS Identity Center permission sets or SSO sessions, see [IRP-IdentityCenterCompromise](IRP-IdentityCenterCompromise.md).
+- **Federated identity / IdP compromise** — If the initial compromise is at the identity provider level (Okta, Azure AD, etc.) leading to AWS access, see [IRP-FederatedAccessAbuse](IRP-FederatedAccessAbuse.md).
 - **Ransomware resulting from credential compromise** — Once containment here is complete, pivot to [IRP-Ransomware](IRP-Ransomware.md) if encryption or extortion activity is detected.
 
 ### Applicable Finding Types

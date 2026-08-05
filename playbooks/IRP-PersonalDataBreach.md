@@ -4,7 +4,7 @@
 > **Last Reviewed:** 2026-06-18
 > **Status:** `Active`
 > **NIST Framework:** SP 800-61r3 (CSF 2.0 Community Profile)
-> **Related Playbooks:** [IRP-DataAccess](IRP-DataAccess.md) | [IRP-CredCompromise](IRP-CredCompromise.md) | [IRP-InsiderThreat](IRP-InsiderThreat.md) (Coming Soon) | [IRP-Ransomware](IRP-Ransomware.md)
+> **Related Playbooks:** [IRP-DataAccess](IRP-DataAccess.md) | [IRP-CredCompromise](IRP-CredCompromise.md) | [IRP-InsiderThreat](IRP-InsiderThreat.md) | [IRP-Ransomware](IRP-Ransomware.md)
 
 ---
 
@@ -22,7 +22,7 @@ This playbook does **not** cover:
 
 - **Unauthorized data access without personal data involvement** — If the accessed data is purely operational (infrastructure configs, non-personal telemetry), see [IRP-DataAccess](IRP-DataAccess.md) for technical response only.
 - **Credential compromise as the initial vector** — If you are still investigating the initial access method, see [IRP-CredCompromise](IRP-CredCompromise.md). Return here once personal data involvement is confirmed.
-- **Insider threat investigation and HR coordination** — If the breach was caused by an authorized insider acting outside their role, see [IRP-InsiderThreat](IRP-InsiderThreat.md) (Coming Soon) for the personnel and investigation aspects. This playbook still applies for the notification obligations.
+- **Insider threat investigation and HR coordination** — If the breach was caused by an authorized insider acting outside their role, see [IRP-InsiderThreat](IRP-InsiderThreat.md) for the personnel and investigation aspects. This playbook still applies for the notification obligations.
 - **Ransomware with data unavailability** — If personal data has been encrypted (availability breach under GDPR), pivot to [IRP-Ransomware](IRP-Ransomware.md) for technical recovery while continuing notification assessment here.
 
 ### Applicable Finding Types
