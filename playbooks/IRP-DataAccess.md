@@ -4,7 +4,7 @@
 > **Last Reviewed:** 2026-06-18
 > **Status:** `Active`
 > **NIST Framework:** SP 800-61r3 (CSF 2.0 Community Profile)
-> **Related Playbooks:** [IRP-CredCompromise](IRP-CredCompromise.md) | [IRP-S3DataExfiltration](IRP-S3DataExfiltration.md) (Coming Soon) | [IRP-PersonalDataBreach](IRP-PersonalDataBreach.md) | [IRP-InsiderThreat](IRP-InsiderThreat.md) (Coming Soon)
+> **Related Playbooks:** [IRP-CredCompromise](IRP-CredCompromise.md) | [IRP-S3DataExfiltration](IRP-S3DataExfiltration.md) (Coming Soon) | [IRP-PersonalDataBreach](IRP-PersonalDataBreach.md) | [IRP-InsiderThreat](IRP-InsiderThreat.md)
 
 ---
 
@@ -23,7 +23,7 @@ This playbook does **not** cover:
 - **Bulk S3 exfiltration with specific presigned URL or VPC endpoint abuse** — For dedicated S3 exfiltration patterns, see [IRP-S3DataExfiltration](IRP-S3DataExfiltration.md). (Coming Soon)
 - **Credential compromise as the root cause** — If the data access resulted from stolen credentials, start with [IRP-CredCompromise](IRP-CredCompromise.md) for containment, then return here for data impact assessment.
 - **Personal data breach regulatory response** — If personal/regulated data is confirmed accessed, cross-reference [IRP-PersonalDataBreach](IRP-PersonalDataBreach.md) for notification obligations.
-- **Insider threat investigation** — If the accessor is an authorized user acting outside their role, see [IRP-InsiderThreat](IRP-InsiderThreat.md). (Coming Soon)
+- **Insider threat investigation** — If the accessor is an authorized user acting outside their role, see [IRP-InsiderThreat](IRP-InsiderThreat.md).
 
 ### Applicable Finding Types
 
