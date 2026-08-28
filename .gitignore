@@ -1,4 +1,9 @@
+## ---Operating System Files---
+
 .DS_STORE
+
+## ---Other software config files---
 .kiro/*
 .kiro/steering/
 .claude/*
+.markdownlint.json
